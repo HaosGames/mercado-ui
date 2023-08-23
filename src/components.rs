@@ -13,20 +13,15 @@ pub fn App(cx: Scope) -> impl IntoView {
         {
             move || match predictions.read(cx) {
                 None => view! {cx, <p>"Loading..."</p>}.into_view(cx),
-                Some(Ok(predictions)) => view! {cx,
+                Some(Ok(mut predictions)) => view! {cx,
                     <div>
                         <p>{predictions.len()}" prediction(s)"</p>
-                        <ul>
-                            {predictions.into_iter()
-                                .map(|prediction| view! {cx,
-                                    <li>{prediction.name}
-                                    " | True: "{prediction.bets_true}"sats, "
-                                    "False: "{prediction.bets_false}"sats"
-                                    " | Ends "{prediction.trading_end.to_rfc2822()}
-                                    " | Judge share: "{prediction.judge_share_ppm / 1000}"%"</li>
-                                })
-                                .collect::<Vec<_>>()}
-                        </ul>
+                        <ul>{
+                            predictions.sort_by(|a, b| a.id.cmp(&b.id));
+                            predictions.into_iter()
+                            .map(|prediction| view! {cx, <PredictionListItem prediction=prediction/>})
+                            .collect::<Vec<_>>()
+                        }</ul>
                     </div>
                 }.into_view(cx),
                 Some(Err(e)) => view! {cx, <p>{format!("Got error: {:?}", e)}</p>}.into_view(cx),
@@ -40,6 +35,18 @@ pub fn App(cx: Scope) -> impl IntoView {
                 "Refresh"
             </button>
         </div>
+    }
+}
+#[component]
+pub fn PredictionListItem(cx: Scope, prediction: PredictionListItemResponse) -> impl IntoView {
+    view! {cx,
+        <li>
+            <p>{prediction.name}</p>
+            <p>" | True: "{prediction.bets_true}"sats, "
+            "False: "{prediction.bets_false}"sats"
+            " | Ends "{prediction.trading_end.to_rfc2822()}
+            " | Judge share: "{prediction.judge_share_ppm / 1000}"%"</p>
+        </li>
     }
 }
 async fn query_predictions(_how_many: u32) -> Result<Vec<PredictionListItemResponse>, String> {
