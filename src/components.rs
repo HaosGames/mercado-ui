@@ -47,7 +47,7 @@ pub fn PredictionListItem(cx: Scope, prediction: PredictionListItemResponse) -> 
             <a href={format!("prediction/{}", prediction.id)}>{prediction.name}</a>
             <p>"True: "{prediction.bets_true}"sats, "
             "False: "{prediction.bets_false}"sats"
-            " | Ends "{prediction.trading_end.to_rfc2822()}
+            " | Ends "{prediction.trading_end.to_string()}
             " | Judge share: "{prediction.judge_share_ppm / 1000}"%"</p>
         </li>
     }
@@ -85,9 +85,23 @@ pub fn UserPredictionOverview(cx: Scope) -> impl IntoView {
         {
             move || match prediction.read(cx) {
                 None => view! {cx, <p>"Loading..."</p>}.into_view(cx),
-                Some(Ok(prediction)) => view! {cx,
+                Some(Ok(mut prediction)) => view! {cx,
                     <div>
                         <h2>{prediction.name}</h2>
+                        <p>{format!("True: {} sats | False: {} sats", prediction.bets_true, prediction.bets_false)}</p>
+                        <p>{format!("End: {} | Judge share: {}% | Decision period: {} days",
+                                    prediction.trading_end,
+                                    prediction.judge_share_ppm/1000,
+                                    prediction.decision_period_sec / 86400
+                            )}</p>
+                        <p>{format!("Judges: {}/{}", prediction.judge_count, 0)}</p>
+                        <p>{format!("User bets: {}", prediction.user_bets.len())}</p>
+                        <ul>{
+                            prediction.user_bets.sort_by(|a, b| a.fund_invoice.cmp(&b.fund_invoice));
+                            prediction.user_bets.into_iter()
+                            .map(|bet| view! {cx, <BetListItem bet=bet/>})
+                            .collect::<Vec<_>>()
+                        }</ul>
                     </div>
                 }.into_view(cx),
                 Some(Err(e)) => view! {cx, <p>{format!("Got error: {:?}", e)}</p>}.into_view(cx),
@@ -95,5 +109,13 @@ pub fn UserPredictionOverview(cx: Scope) -> impl IntoView {
         }
         </div>
 
+    }
+}
+#[component]
+pub fn BetListItem(cx: Scope, bet: Bet) -> impl IntoView {
+    view! {cx,
+        <li>
+        {format!("{}: {} sats", bet.bet, bet.amount.unwrap_or(0))}
+        </li>
     }
 }
