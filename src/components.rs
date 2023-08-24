@@ -5,14 +5,14 @@ use leptos_router::*;
 use mercado::api::*;
 
 #[component]
-pub fn App(cx: Scope) -> impl IntoView {
-    view! {cx,
+pub fn App() -> impl IntoView {
+    view! {
         <PredictionList/>
     }
 }
 #[component]
-pub fn PredictionListItem(cx: Scope, prediction: PredictionOverviewResponse) -> impl IntoView {
-    view! {cx,
+pub fn PredictionListItem(prediction: PredictionOverviewResponse) -> impl IntoView {
+    view! {
         <li>
             <a href={format!("prediction/{}", prediction.id)}>{prediction.name}</a>
             <p>"Ends "{prediction.trading_end.to_string()}
@@ -21,26 +21,26 @@ pub fn PredictionListItem(cx: Scope, prediction: PredictionOverviewResponse) -> 
     }
 }
 #[component]
-pub fn PredictionList(cx: Scope) -> impl IntoView {
-    let predictions = create_local_resource(cx, move || {}, get_predictions);
+pub fn PredictionList() -> impl IntoView {
+    let predictions = create_local_resource(move || {}, get_predictions);
 
-    view! { cx,
+    view! {
         <div>
         {
-            move || match predictions.read(cx) {
-                None => view! {cx, <p>"Loading..."</p>}.into_view(cx),
-                Some(Ok(mut predictions)) => view! {cx,
+            move || match predictions.read() {
+                None => view! {<p>"Loading..."</p>}.into_view(),
+                Some(Ok(mut predictions)) => view! {
                     <div>
                         <p>{predictions.len()}" prediction(s)"</p>
                         <ul>{
                             predictions.sort_by(|a, b| a.id.cmp(&b.id));
                             predictions.into_iter()
-                            .map(|prediction| view! {cx, <PredictionListItem prediction=prediction/>})
+                            .map(|prediction| view! {<PredictionListItem prediction=prediction/>})
                             .collect::<Vec<_>>()
                         }</ul>
                     </div>
-                }.into_view(cx),
-                Some(Err(e)) => view! {cx, <p>{format!("Got error: {:?}", e)}</p>}.into_view(cx),
+                }.into_view(),
+                Some(Err(e)) => view! {<p>{format!("Got error: {:?}", e)}</p>}.into_view(),
             }
         }
         </div>
@@ -48,35 +48,33 @@ pub fn PredictionList(cx: Scope) -> impl IntoView {
 }
 
 #[component]
-pub fn PredictionOverview(cx: Scope) -> impl IntoView {
-    let params = use_params_map(cx);
+pub fn PredictionOverview() -> impl IntoView {
+    let params = use_params_map();
     let prediction = create_local_resource(
-        cx,
         move || params.with(|p| p.get("id").cloned().unwrap_or_default()),
         move |id| get_prediction_overview(id.parse().unwrap_or_default()),
     );
     let judges = create_local_resource(
-        cx,
         move || params.with(|p| p.get("id").cloned().unwrap_or_default()),
         move |id| get_prediction_judges(id.parse().unwrap_or_default()),
     );
-    view! {cx,
+    view! {
         <div>
         {
-            move || match prediction.read(cx) {
-                None => view! {cx, <p>"Loading..."</p>}.into_view(cx),
-                Some(Ok(prediction)) => view! {cx,
+            move || match prediction.read() {
+                None => view! {<p>"Loading..."</p>}.into_view(),
+                Some(Ok(prediction)) => view! {
                     <div>
                         <h2>{prediction.name}</h2>
                         <p>{format!("End: {} | Judge share: {}% | Decision period: {} days",
                                     prediction.trading_end,
-                                    prediction.judge_share_ppm/1000,
+                                    prediction.judge_share_ppm/10000,
                                     prediction.decision_period_sec / 86400
                             )}</p>
                         <p>{format!("Judges: {}/{}", prediction.judge_count, 0)}</p>
                     </div>
-                }.into_view(cx),
-                Some(Err(e)) => view! {cx, <p>{format!("Got error: {:?}", e)}</p>}.into_view(cx),
+                }.into_view(),
+                Some(Err(e)) => view! {<p>{format!("Got error: {:?}", e)}</p>}.into_view(),
             }
         }
         </div>
@@ -84,12 +82,12 @@ pub fn PredictionOverview(cx: Scope) -> impl IntoView {
     }
 }
 #[component]
-pub fn BetListItem(cx: Scope, bet: Bet) -> impl IntoView {
-    view! {cx,
+pub fn BetListItem(bet: Bet) -> impl IntoView {
+    view! {
         <li>
         {format!("{}: {} sats", bet.bet, bet.amount.unwrap_or(0))}
         </li>
     }
 }
 #[component]
-pub fn JudgeList(cx: Scope, judges: Vec<Judge>) -> impl IntoView {}
+pub fn JudgeList(judges: Vec<Judge>) -> impl IntoView {}

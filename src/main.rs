@@ -8,8 +8,8 @@ mod fetchers;
 const URL: &str = "http://127.0.0.1:8081";
 
 fn main() {
-    mount_to_body(|cx| {
-        view! { cx,
+    mount_to_body(|| {
+        view! {
             <div id="root">
                 <Router>
                     <nav>
@@ -18,7 +18,7 @@ fn main() {
                     <main>
                         <Routes>
                             <Route path="" view=App/>
-                            <Route path="prediction" view=move |_| view! {cx, <Outlet/>}>
+                            <Route path="prediction" view=move || view! {<Outlet/>}>
                                 <Route path=":id" view=PredictionOverview/>
                                 <Route path="" view=App/>
                             </Route>
