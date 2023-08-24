@@ -3,6 +3,7 @@ use leptos::*;
 use leptos_router::*;
 
 mod components;
+mod fetchers;
 
 const URL: &str = "http://127.0.0.1:8081";
 
@@ -18,7 +19,7 @@ fn main() {
                         <Routes>
                             <Route path="" view=App/>
                             <Route path="prediction" view=move |_| view! {cx, <Outlet/>}>
-                                <Route path=":id" view=UserPredictionOverview/>
+                                <Route path=":id" view=PredictionOverview/>
                                 <Route path="" view=App/>
                             </Route>
                         </Routes>

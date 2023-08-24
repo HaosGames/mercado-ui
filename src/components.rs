@@ -1,12 +1,10 @@
-#![allow(non_snake_case)]
-use anyhow::Result;
+#![allow(non_snake_case, unused)]
+use crate::fetchers::*;
 use leptos::*;
 use leptos_router::*;
 use mercado::api::*;
-use mercado::client::Client;
 
-use crate::URL;
-
+#[component]
 pub fn App(cx: Scope) -> impl IntoView {
     view! {cx,
         <PredictionList/>
@@ -18,26 +16,11 @@ pub fn PredictionListItem(cx: Scope, prediction: PredictionOverviewResponse) -> 
         <li>
             <a href={format!("prediction/{}", prediction.id)}>{prediction.name}</a>
             <p>"Ends "{prediction.trading_end.to_string()}
-            " | Judge share: "{prediction.judge_share_ppm / 1000}"%"</p>
+            " | Judge share: "{prediction.judge_share_ppm / 10000}"%"</p>
         </li>
     }
 }
-async fn get_predictions(_: ()) -> Result<Vec<PredictionOverviewResponse>, String> {
-    let client = Client::new(URL.to_string());
-    client.get_predictions().await.map_err(map_any_err)
-}
-async fn get_prediction_overview(prediction: RowId) -> Result<PredictionOverviewResponse, String> {
-    let client = Client::new(URL.to_string());
-    let request = PredictionRequest {
-        user: None,
-        prediction,
-    };
-    client
-        .get_prediction_overview(request)
-        .await
-        .map_err(map_any_err)
-}
-
+#[component]
 pub fn PredictionList(cx: Scope) -> impl IntoView {
     let predictions = create_local_resource(cx, move || {}, get_predictions);
 
@@ -65,12 +48,17 @@ pub fn PredictionList(cx: Scope) -> impl IntoView {
 }
 
 #[component]
-pub fn UserPredictionOverview(cx: Scope) -> impl IntoView {
+pub fn PredictionOverview(cx: Scope) -> impl IntoView {
     let params = use_params_map(cx);
     let prediction = create_local_resource(
         cx,
         move || params.with(|p| p.get("id").cloned().unwrap_or_default()),
         move |id| get_prediction_overview(id.parse().unwrap_or_default()),
+    );
+    let judges = create_local_resource(
+        cx,
+        move || params.with(|p| p.get("id").cloned().unwrap_or_default()),
+        move |id| get_prediction_judges(id.parse().unwrap_or_default()),
     );
     view! {cx,
         <div>
@@ -103,3 +91,5 @@ pub fn BetListItem(cx: Scope, bet: Bet) -> impl IntoView {
         </li>
     }
 }
+#[component]
+pub fn JudgeList(cx: Scope, judges: Vec<Judge>) -> impl IntoView {}
