@@ -30,3 +30,10 @@ pub async fn get_prediction_judges(prediction: RowId) -> Result<Vec<Judge>, Stri
         .await
         .map_err(map_any_err)
 }
+pub async fn get_prediction_bets(request: PredictionRequest) -> Result<Vec<Bet>, String> {
+    let client = Client::new(URL.to_string());
+    client
+        .get_prediction_bets(request)
+        .await
+        .map_err(map_any_err)
+}
