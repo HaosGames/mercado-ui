@@ -4,6 +4,8 @@ use leptos_router::*;
 
 mod components;
 
+const URL: &str = "http://127.0.0.1:8081";
+
 fn main() {
     mount_to_body(|cx| {
         view! { cx,
