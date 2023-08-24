@@ -37,3 +37,8 @@ pub async fn get_prediction_bets(request: PredictionRequest) -> Result<Vec<Bet>,
         .await
         .map_err(map_any_err)
 }
+
+pub async fn accept_nomination(request: AcceptNominationRequest) -> Result<(), String> {
+    let client = Client::new(URL.to_string());
+    client.accept_nomination(request).await.map_err(map_any_err)
+}

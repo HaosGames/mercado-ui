@@ -1,4 +1,4 @@
-#![allow(non_snake_case, unused)]
+#![allow(non_snake_case)]
 use crate::fetchers::*;
 use leptos::*;
 use leptos_router::*;
@@ -62,6 +62,7 @@ pub fn PredictionOverview() -> impl IntoView {
                 Some(Ok(prediction)) => view! {
                     <div>
                         <h2>{prediction.name}</h2>
+                        <p>{format!("State: {}", prediction.state)}</p>
                         <p>{format!("End: {} | Judge share: {}% | Decision period: {} days",
                                     prediction.trading_end,
                                     prediction.judge_share_ppm/10000,
@@ -76,14 +77,6 @@ pub fn PredictionOverview() -> impl IntoView {
         }
         </div>
 
-    }
-}
-#[component]
-pub fn BetListItem(bet: Bet) -> impl IntoView {
-    view! {
-        <li>
-        {format!("{}: {} sats", bet.bet, bet.amount.unwrap_or(0))}
-        </li>
     }
 }
 #[component]
@@ -102,7 +95,7 @@ pub fn JudgeList(prediction: RowId, judge_count: u32) -> impl IntoView {
                         <ul>
                             <For each=move || judges.clone() key=move |judge| judge.user
                             view=move |judge: Judge| view!{
-                                <li>{format!("{}", judge.user)}</li>
+                                <JudgeListItem judge=judge />
                             }/>
                         </ul>
                     </div>
@@ -111,6 +104,21 @@ pub fn JudgeList(prediction: RowId, judge_count: u32) -> impl IntoView {
 
             }
         }
+    }
+}
+#[component]
+pub fn JudgeListItem(judge: Judge) -> impl IntoView {
+    let accept = create_action(|judge: &Judge| {
+        accept_nomination(AcceptNominationRequest {
+            prediction: judge.prediction,
+            user: judge.user,
+        })
+    });
+    view! {
+        <li>
+            {format!("{} | {} ", judge.user, judge.state)}
+            <button type="submit" on:click=move |_| accept.dispatch(judge.clone())>"Accept Nomination"</button>
+        </li>
     }
 }
 #[component]
@@ -129,7 +137,7 @@ pub fn BetList(prediction: RowId, user: Option<UserPubKey>) -> impl IntoView {
                         <ul>
                             <For each=move || bets.clone() key=move |judge| judge.user
                             view=move |bet: Bet| view!{
-                                <li>{format!("{}", bet.user)}</li>
+                                <li>{format!("{} | {} sats | {}", bet.bet, bet.amount.unwrap_or(0), bet.user)}</li>
                             }/>
                         </ul>
                     </div>
