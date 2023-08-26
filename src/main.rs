@@ -1,4 +1,4 @@
-use crate::{components::*, fetchers::try_login};
+use crate::{components::*, fetchers::check_login};
 use leptos::*;
 use leptos_router::*;
 use mercado::api::AccessRequest;
@@ -30,16 +30,7 @@ fn main() {
                 }
             }
         });
-        let login_result = create_local_resource(
-            move || {
-                (
-                    access.get().unwrap().user.to_string(),
-                    access.get().unwrap().sig.to_string(),
-                    set_access,
-                )
-            },
-            try_login,
-        );
+        let check_login = create_local_resource(move || access.get().unwrap(), check_login);
 
         view! {
             <div id="root">
@@ -48,7 +39,7 @@ fn main() {
                         <a href="/">"Home"</a>
                         " "
                         {
-                            move || if access.get().is_some() && login_result.read().transpose().ok().flatten().is_some() {
+                            move || if access.get().is_some() && check_login.read().transpose().ok().flatten().is_some() {
                                 view!{
                                     <a href="/" on:click=move |_| {set_access.set(None)} >{format!("Logout")}</a>
                                 }
@@ -64,7 +55,7 @@ fn main() {
                         <Routes>
                             <Route path="" view=App/>
                             <Route path="prediction" view=move || view! {<Outlet/>}>
-                                <Route path=":id" view=PredictionOverview/>
+                                <Route path=":id" view=move || view! {<PredictionOverview access=access />}/>
                                 <Route path="" view=App/>
                             </Route>
                             <Route path="login" view=move || view! {<Login set_access=set_access />} />

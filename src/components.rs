@@ -86,7 +86,7 @@ pub fn PredictionList() -> impl IntoView {
 }
 
 #[component]
-pub fn PredictionOverview() -> impl IntoView {
+pub fn PredictionOverview(access: ReadSignal<Option<AccessRequest>>) -> impl IntoView {
     let params = use_params_map();
     let prediction = create_local_resource(
         move || params.with(|p| p.get("id").cloned().unwrap_or_default()),
@@ -106,7 +106,7 @@ pub fn PredictionOverview() -> impl IntoView {
                                     prediction.judge_share_ppm/10000,
                                     prediction.decision_period_sec / 86400
                             )}</p>
-                        <JudgeList prediction=prediction.id judge_count=prediction.judge_count/>
+                        <JudgeList prediction=prediction.id judge_count=prediction.judge_count access=access/>
                         <BetList prediction=prediction.id user=None />
                     </div>
                 }.into_view(),
@@ -118,7 +118,11 @@ pub fn PredictionOverview() -> impl IntoView {
     }
 }
 #[component]
-pub fn JudgeList(prediction: RowId, judge_count: u32) -> impl IntoView {
+pub fn JudgeList(
+    prediction: RowId,
+    judge_count: u32,
+    access: ReadSignal<Option<AccessRequest>>,
+) -> impl IntoView {
     let judges = create_local_resource(
         move || prediction,
         move |prediction| get_prediction_judges(prediction),
@@ -133,7 +137,7 @@ pub fn JudgeList(prediction: RowId, judge_count: u32) -> impl IntoView {
                         <ul>
                             <For each=move || judges.clone() key=move |judge| judge.user
                             view=move |judge: Judge| view!{
-                                <JudgeListItem judge=judge />
+                                <JudgeListItem judge=judge access=access />
                             }/>
                         </ul>
                     </div>
@@ -145,17 +149,14 @@ pub fn JudgeList(prediction: RowId, judge_count: u32) -> impl IntoView {
     }
 }
 #[component]
-pub fn JudgeListItem(judge: Judge) -> impl IntoView {
-    let accept = create_action(|judge: &Judge| {
-        accept_nomination(AcceptNominationRequest {
-            prediction: judge.prediction,
-            user: judge.user,
-        })
+pub fn JudgeListItem(judge: Judge, access: ReadSignal<Option<AccessRequest>>) -> impl IntoView {
+    let accept = create_action(|request: &PostRequest<AcceptNominationRequest>| {
+        accept_nomination(request.data.clone(), request.access)
     });
     view! {
         <li>
             {format!("{} | {} ", judge.user, judge.state)}
-            <button type="submit" on:click=move |_| accept.dispatch(judge.clone())>"Accept Nomination"</button>
+            <button type="submit" on:click=move |_| accept.dispatch(PostRequest {data: AcceptNominationRequest {user: judge.user, prediction: judge.prediction}, access: access.get().unwrap()})>"Accept Nomination"</button>
         </li>
     }
 }

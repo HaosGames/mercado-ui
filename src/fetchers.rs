@@ -42,9 +42,15 @@ pub async fn get_prediction_bets(request: PredictionRequest) -> Result<Vec<Bet>,
         .map_err(map_any_err)
 }
 
-pub async fn accept_nomination(request: AcceptNominationRequest) -> Result<(), String> {
+pub async fn accept_nomination(
+    request: AcceptNominationRequest,
+    access: AccessRequest,
+) -> Result<(), String> {
     let client = Client::new(URL.to_string());
-    client.accept_nomination(request).await.map_err(map_any_err)
+    client
+        .accept_nomination(request, access)
+        .await
+        .map_err(map_any_err)
 }
 pub async fn get_login_challenge(user: String) -> Result<String, String> {
     let client = Client::new(URL.to_string());
@@ -74,4 +80,9 @@ pub async fn try_login(
         sig: request.sig,
     }));
     Ok(format!("Successfull login as {}", user))
+}
+pub async fn check_login(access: AccessRequest) -> Result<String, String> {
+    let client = Client::new(URL.to_string());
+    client.check_login(access).await.map_err(map_any_err)?;
+    Ok("".to_string())
 }
