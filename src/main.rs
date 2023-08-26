@@ -1,4 +1,4 @@
-use crate::components::*;
+use crate::{components::*, fetchers::try_login};
 use leptos::*;
 use leptos_router::*;
 use mercado::api::AccessRequest;
@@ -30,6 +30,16 @@ fn main() {
                 }
             }
         });
+        let login_result = create_local_resource(
+            move || {
+                (
+                    access.get().unwrap().user.to_string(),
+                    access.get().unwrap().sig.to_string(),
+                    set_access,
+                )
+            },
+            try_login,
+        );
 
         view! {
             <div id="root">
@@ -38,15 +48,16 @@ fn main() {
                         <a href="/">"Home"</a>
                         " "
                         {
-                            move || if let Some(access) = access.get() {
+                            move || if access.get().is_some() && login_result.read().transpose().ok().flatten().is_some() {
                                 view!{
-                                    <a href="/" on:click=move |_| {set_access.set(None)} >{format!("Logout {}", access.user)}</a>
+                                    <a href="/" on:click=move |_| {set_access.set(None)} >{format!("Logout")}</a>
                                 }
                             } else {
                                 view!{
                                     <a href="/login">"Login"</a>
                                 }
                             }
+
                         }
                     </nav>
                     <main>
