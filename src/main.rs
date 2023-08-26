@@ -1,19 +1,53 @@
 use crate::components::*;
 use leptos::*;
 use leptos_router::*;
+use mercado::api::AccessRequest;
 
 mod components;
 mod fetchers;
 
 const URL: &str = "http://127.0.0.1:8081";
+const STORAGE_KEY: &str = "mercado_access";
 
 fn main() {
     mount_to_body(|| {
+        let (access, set_access) = create_signal::<Option<AccessRequest>>(None);
+        let storage_access = window().local_storage().ok().flatten().and_then(|storage| {
+            storage
+                .get_item(STORAGE_KEY)
+                .ok()
+                .flatten()
+                .and_then(|value| serde_json::from_str::<Option<AccessRequest>>(&value).ok())
+                .unwrap()
+        });
+        set_access.set(storage_access);
+        create_effect(move |_| {
+            if let Ok(Some(storage)) = window().local_storage() {
+                let json =
+                    serde_json::to_string(&access.get()).expect("couldn't serialize AccessRequest");
+                if storage.set_item(STORAGE_KEY, &json).is_err() {
+                    error!("error while trying to set item in localStorage");
+                }
+            }
+        });
+
         view! {
             <div id="root">
                 <Router>
                     <nav>
                         <a href="/">"Home"</a>
+                        " "
+                        {
+                            move || if let Some(access) = access.get() {
+                                view!{
+                                    <a href="/" on:click=move |_| {set_access.set(None)} >{format!("Logout {}", access.user)}</a>
+                                }
+                            } else {
+                                view!{
+                                    <a href="/login">"Login"</a>
+                                }
+                            }
+                        }
                     </nav>
                     <main>
                         <Routes>
@@ -22,6 +56,7 @@ fn main() {
                                 <Route path=":id" view=PredictionOverview/>
                                 <Route path="" view=App/>
                             </Route>
+                            <Route path="login" view=move || view! {<Login set_access=set_access />} />
                         </Routes>
                     </main>
                 </Router>

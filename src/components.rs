@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 use crate::fetchers::*;
-use leptos::*;
+use leptos::{html::Input, *};
 use leptos_router::*;
 use mercado::api::*;
 
@@ -8,6 +8,44 @@ use mercado::api::*;
 pub fn App() -> impl IntoView {
     view! {
         <PredictionList/>
+    }
+}
+#[component]
+pub fn Login(set_access: WriteSignal<Option<AccessRequest>>) -> impl IntoView {
+    let (user, set_user) = create_signal(String::from(""));
+    let challenge = create_local_resource(move || user.get(), get_login_challenge);
+    let (signature, set_signature) = create_signal(String::from(""));
+    let result =
+        create_local_resource(move || (user.get(), signature.get(), set_access), try_login);
+
+    let user_input: NodeRef<Input> = create_node_ref();
+    let signature_input: NodeRef<Input> = create_node_ref();
+
+    view! {
+        <div>
+            <label>"User secp256k1 public key "</label>
+            <input
+                type="text"
+                value=move || user.get()
+                node_ref=user_input
+            />
+            <button on:click=move |_| {
+                let value = user_input.get().unwrap().value();
+                set_user.set(value);
+            }>"Get singing challenge"</button>
+            <p>"Sign the following message: "{move || challenge.read().transpose().ok().flatten()}</p>
+            <label>"ECDSA Signature: "</label>
+            <input
+                type="text"
+                value=move || signature.get()
+                node_ref=signature_input
+            />
+            <button on:click=move |_| {
+                let value = signature_input.get().unwrap().value();
+                set_signature.set(value);
+            }>"Login"</button>
+            <p>{move || result.read().transpose().ok().flatten() }</p>
+        </div>
     }
 }
 #[component]

@@ -1104,6 +1104,8 @@ dependencies = [
  "leptos",
  "leptos_router",
  "mercado",
+ "serde_json",
+ "web-sys",
 ]
 
 [[package]]
