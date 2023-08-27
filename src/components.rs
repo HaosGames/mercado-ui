@@ -23,23 +23,21 @@ pub fn Login(set_access: WriteSignal<Option<AccessRequest>>) -> impl IntoView {
 
     view! {
         <div>
-            <label>"User secp256k1 public key "</label>
-            <input
+            <label>"User secp256k1 public key "<input
                 type="text"
                 value=move || user.get()
                 node_ref=user_input
-            />
+            /></label>
             <button on:click=move |_| {
                 let value = user_input.get().unwrap().value();
                 set_user.set(value);
             }>"Get singing challenge"</button>
             <p>"Sign the following message: "{move || challenge.read().transpose().ok().flatten()}</p>
-            <label>"ECDSA Signature: "</label>
-            <input
+            <label>"ECDSA Signature: "<input
                 type="text"
                 value=move || signature.get()
                 node_ref=signature_input
-            />
+            /></label>
             <button on:click=move |_| {
                 let value = signature_input.get().unwrap().value();
                 set_signature.set(value);
@@ -104,13 +102,12 @@ pub fn PredictionOverview(access: ReadSignal<Option<AccessRequest>>) -> impl Int
                 None => view! {<p>"Loading..."</p>}.into_view(),
                 Some(Ok(prediction)) => view! {
                     <div>
-                        <h2>{prediction.name}</h2>
-                        <p>{format!("State: {}", prediction.state)}</p>
-                        <p>{format!("End: {} | Judge share: {}% | Decision period: {} days",
-                                    prediction.trading_end,
-                                    prediction.judge_share_ppm/10000,
-                                    prediction.decision_period_sec / 86400
-                            )}</p>
+                        <h3>{prediction.name}</h3>
+                        <p>"State: "{prediction.state.to_string()}<br/>
+                        "End: "{prediction.trading_end.to_string()}<br/>
+                        "Judge share: "{prediction.judge_share_ppm/10000}"%"<br/>
+                        "Decision period: "{prediction.decision_period_sec/86400}" days"<br/>
+                        </p>
                         <JudgeList prediction=prediction.id judge_count=prediction.judge_count access=access/>
                         <BetList prediction=prediction.id user=None />
                     </div>
@@ -137,8 +134,8 @@ pub fn JudgeList(
             move || match judges.read() {
                 None => view! {<p>"Loading..."</p>}.into_view(),
                 Some(Ok(judges)) => view! {
-                    <div>
-                        <p>{format!("Judges: {}/{}", judge_count, judges.len())}</p>
+                    <details open>
+                        <summary>{format!("Judges: {}/{}", judge_count, judges.len())}</summary>
                         <table>
                             <tr>
                                 <th>"Judge"</th>
@@ -150,7 +147,7 @@ pub fn JudgeList(
                                 <JudgeListItem judge=judge access=access />
                             }/>
                         </table>
-                    </div>
+                    </details>
                 }.into_view(),
                 Some(Err(e)) => view! {<p>{format!("Got error: {:?}", e)}</p>}.into_view(),
 
@@ -163,14 +160,27 @@ pub fn JudgeListItem(judge: Judge, access: ReadSignal<Option<AccessRequest>>) ->
     let accept = create_action(|request: &PostRequest<AcceptNominationRequest>| {
         accept_nomination(request.data.clone(), request.access)
     });
+    let refuse = create_action(|request: &PostRequest<AcceptNominationRequest>| {
+        refuse_nomination(request.data.clone(), request.access)
+    });
     view! {
         <tr>
             <td>{move || judge.user.to_string()}</td>
             <td>{move || judge.state.to_string()}</td>
-            <td><a href="#" role="button" type="submit" on:click=move |_|
-                accept.dispatch(PostRequest {data: AcceptNominationRequest {user: judge.user, prediction: judge.prediction}, access: access.get().unwrap()})>
-                "Accept"
-            </a></td>
+            <td>
+                <a href="#" role="button" class="outline" on:click=move |_|
+                    accept.dispatch(PostRequest {
+                        data: AcceptNominationRequest {user: judge.user, prediction: judge.prediction},
+                        access: access.get().unwrap()})>
+                    "Accept"
+                </a>
+                <a href="#" role="button" class="outline contrast" on:click=move |_|
+                    refuse.dispatch(PostRequest {
+                        data: AcceptNominationRequest {user: judge.user, prediction: judge.prediction},
+                        access: access.get().unwrap()})>
+                    "Refuse"
+                </a>
+            </td>
         </tr>
     }
 }
@@ -185,19 +195,53 @@ pub fn BetList(prediction: RowId, user: Option<UserPubKey>) -> impl IntoView {
             move || match bets.read() {
                 None => view! {<p>"Loading..."</p>}.into_view(),
                 Some(Ok(bets)) => view! {
-                    <div>
-                        <p>{format!("Bets: {}", bets.len())}</p>
-                        <ul>
+                    <details>
+                        <summary>{format!("Bets: {}", bets.len())}</summary>
+                        <table>
+                            <tr>
+                                <th>"Bet"</th>
+                                <th>"Amount"</th>
+                                <th>"User"</th>
+                            </tr>
                             <For each=move || bets.clone() key=move |judge| judge.user
                             view=move |bet: Bet| view!{
-                                <li>{format!("{} | {} sats | {}", bet.bet, bet.amount.unwrap_or(0), bet.user)}</li>
+                                <tr>
+                                    <td>{bet.bet}</td>
+                                    <td>{bet.amount.unwrap_or(0)}</td>
+                                    <td>{bet.user.to_string()}</td>
+                                </tr>
                             }/>
-                        </ul>
-                    </div>
+                        </table>
+                    </details>
                 }.into_view(),
                 Some(Err(e)) => view! {<p>{format!("Got error: {:?}", e)}</p>}.into_view(),
 
             }
         }
+    }
+}
+#[component]
+pub fn Username(user: Option<UserPubKey>) -> impl IntoView {
+    let mut names = vec![];
+    if let Some(user) = user {
+        names.push(user);
+    }
+    let usernames = create_local_resource(move || names.clone(), get_usernames);
+
+    view! {
+        {
+            move || {
+                if let Some(user) = user {
+                    let name = usernames.read().transpose().ok().flatten().unwrap_or_default()
+                        .get(&user).cloned().unwrap_or(user.to_string());
+                    if name.is_empty() {
+                        user.to_string()
+                    } else {name}
+                } else {
+                    "User".to_string()
+                }
+            }
+        }
+        ""
     }
 }

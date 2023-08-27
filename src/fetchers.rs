@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::str::FromStr;
 
 use crate::URL;
@@ -52,6 +53,16 @@ pub async fn accept_nomination(
         .await
         .map_err(map_any_err)
 }
+pub async fn refuse_nomination(
+    request: AcceptNominationRequest,
+    access: AccessRequest,
+) -> Result<(), String> {
+    let client = Client::new(URL.to_string());
+    client
+        .refuse_nomination(request, access)
+        .await
+        .map_err(map_any_err)
+}
 pub async fn get_login_challenge(user: String) -> Result<String, String> {
     let client = Client::new(URL.to_string());
     let user = UserPubKey::from_str(user.as_str())
@@ -85,4 +96,9 @@ pub async fn check_login(access: AccessRequest) -> Result<String, String> {
     let client = Client::new(URL.to_string());
     client.check_login(access).await.map_err(map_any_err)?;
     Ok("".to_string())
+}
+pub async fn get_usernames(users: Vec<UserPubKey>) -> Result<HashMap<UserPubKey, String>, String> {
+    let client = Client::new(URL.to_string());
+    let names = client.get_usernames(users).await.map_err(map_any_err)?;
+    Ok(names)
 }
