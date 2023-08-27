@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::str::FromStr;
 
 use crate::URL;
@@ -97,8 +96,8 @@ pub async fn check_login(access: AccessRequest) -> Result<String, String> {
     client.check_login(access).await.map_err(map_any_err)?;
     Ok("".to_string())
 }
-pub async fn get_usernames(users: Vec<UserPubKey>) -> Result<HashMap<UserPubKey, String>, String> {
+pub async fn get_username(user: UserPubKey) -> Result<String, String> {
     let client = Client::new(URL.to_string());
-    let names = client.get_usernames(users).await.map_err(map_any_err)?;
-    Ok(names)
+    let name = client.get_username(user).await.map_err(map_any_err)?;
+    Ok(name)
 }

@@ -215,33 +215,24 @@ pub fn BetList(prediction: RowId, user: Option<UserPubKey>) -> impl IntoView {
                     </details>
                 }.into_view(),
                 Some(Err(e)) => view! {<p>{format!("Got error: {:?}", e)}</p>}.into_view(),
-
             }
         }
     }
 }
 #[component]
 pub fn Username(user: Option<UserPubKey>) -> impl IntoView {
-    let mut names = vec![];
-    if let Some(user) = user {
-        names.push(user);
-    }
-    let usernames = create_local_resource(move || names.clone(), get_usernames);
+    let usernames = create_local_resource(move || user.unwrap(), get_username);
 
-    view! {
-        {
-            move || {
-                if let Some(user) = user {
-                    let name = usernames.read().transpose().ok().flatten().unwrap_or_default()
-                        .get(&user).cloned().unwrap_or(user.to_string());
-                    if name.is_empty() {
-                        user.to_string()
-                    } else {name}
-                } else {
-                    "User".to_string()
-                }
+    view! {{
+        move || {
+            if let Some(user) = user {
+                let name = usernames.read().transpose().ok().flatten().unwrap_or_default();
+                if name.is_empty() {
+                    user.to_string()
+                } else {name}
+            } else {
+                "User".to_string()
             }
-        }
-        ""
-    }
+        }.into_view()
+    }}
 }
