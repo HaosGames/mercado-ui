@@ -1,5 +1,6 @@
 use crate::{components::*, fetchers::check_login};
 use leptos::*;
+use leptos_meta::*;
 use leptos_router::*;
 use mercado::api::AccessRequest;
 
@@ -34,6 +35,7 @@ fn main() {
 
         view! {
             <div id="root">
+                <Stylesheet href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css" />
                 <Router>
                     <nav class="container">
                         <ul>
