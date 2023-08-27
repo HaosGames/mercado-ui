@@ -51,11 +51,11 @@ pub fn Login(set_access: WriteSignal<Option<AccessRequest>>) -> impl IntoView {
 #[component]
 pub fn PredictionListItem(prediction: PredictionOverviewResponse) -> impl IntoView {
     view! {
-        <li>
-            <a href={format!("prediction/{}", prediction.id)}>{prediction.name}</a>
-            <p>"Ends "{prediction.trading_end.to_string()}
-            " | Judge share: "{prediction.judge_share_ppm / 10000}"%"</p>
-        </li>
+        <tr>
+            <td><a href={format!("prediction/{}", prediction.id)}>{prediction.name}</a></td>
+            <td>{prediction.trading_end.to_string()}</td>
+            <td>{prediction.judge_share_ppm / 10000}"%"</td>
+        </tr>
     }
 }
 #[component]
@@ -68,15 +68,20 @@ pub fn PredictionList() -> impl IntoView {
             move || match predictions.read() {
                 None => view! {<p>"Loading..."</p>}.into_view(),
                 Some(Ok(mut predictions)) => view! {
-                    <div>
-                        <p>{predictions.len()}" prediction(s)"</p>
-                        <ul>{
+                    <p>{predictions.len()}" prediction(s)"</p>
+                    <table role="grid">
+                        <tr>
+                           <th>"Prediction"</th>
+                           <th>"End"</th>
+                           <th>"Judge Share"</th>
+                        </tr>
+                        {
                             predictions.sort_by(|a, b| a.id.cmp(&b.id));
                             predictions.into_iter()
                             .map(|prediction| view! {<PredictionListItem prediction=prediction/>})
                             .collect::<Vec<_>>()
-                        }</ul>
-                    </div>
+                        }
+                    </table>
                 }.into_view(),
                 Some(Err(e)) => view! {<p>{format!("Got error: {:?}", e)}</p>}.into_view(),
             }
@@ -134,12 +139,17 @@ pub fn JudgeList(
                 Some(Ok(judges)) => view! {
                     <div>
                         <p>{format!("Judges: {}/{}", judge_count, judges.len())}</p>
-                        <ul>
+                        <table>
+                            <tr>
+                                <th>"Judge"</th>
+                                <th>"State"</th>
+                                <th>"Actions"</th>
+                            </tr>
                             <For each=move || judges.clone() key=move |judge| judge.user
                             view=move |judge: Judge| view!{
                                 <JudgeListItem judge=judge access=access />
                             }/>
-                        </ul>
+                        </table>
                     </div>
                 }.into_view(),
                 Some(Err(e)) => view! {<p>{format!("Got error: {:?}", e)}</p>}.into_view(),
@@ -154,10 +164,14 @@ pub fn JudgeListItem(judge: Judge, access: ReadSignal<Option<AccessRequest>>) ->
         accept_nomination(request.data.clone(), request.access)
     });
     view! {
-        <li>
-            {format!("{} | {} ", judge.user, judge.state)}
-            <button type="submit" on:click=move |_| accept.dispatch(PostRequest {data: AcceptNominationRequest {user: judge.user, prediction: judge.prediction}, access: access.get().unwrap()})>"Accept Nomination"</button>
-        </li>
+        <tr>
+            <td>{move || judge.user.to_string()}</td>
+            <td>{move || judge.state.to_string()}</td>
+            <td><a href="#" role="button" type="submit" on:click=move |_|
+                accept.dispatch(PostRequest {data: AcceptNominationRequest {user: judge.user, prediction: judge.prediction}, access: access.get().unwrap()})>
+                "Accept"
+            </a></td>
+        </tr>
     }
 }
 #[component]

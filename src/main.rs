@@ -35,10 +35,12 @@ fn main() {
         view! {
             <div id="root">
                 <Router>
-                    <nav>
-                        <a href="/">"Home"</a>
-                        " "
-                        {
+                    <nav class="container">
+                        <ul></ul>
+                        <ul>
+                        <li><a href="/"><strong>"Mercado"</strong></a></li>
+                        </ul>
+                        <ul><li>{
                             move || if access.get().is_some() && check_login.read().transpose().ok().flatten().is_some() {
                                 view!{
                                     <a href="/" on:click=move |_| {set_access.set(None)} >{format!("Logout")}</a>
@@ -49,9 +51,9 @@ fn main() {
                                 }
                             }
 
-                        }
+                        }</li></ul>
                     </nav>
-                    <main>
+                    <main class="container">
                         <Routes>
                             <Route path="" view=App/>
                             <Route path="prediction" view=move || view! {<Outlet/>}>
