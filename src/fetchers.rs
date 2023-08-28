@@ -91,9 +91,13 @@ pub async fn try_login(
     }));
     Ok(format!("Successfull login as {}", user))
 }
-pub async fn check_login(access: AccessRequest) -> Result<String, String> {
+pub async fn check_login(access: Option<AccessRequest>) -> Result<String, String> {
     let client = Client::new(URL.to_string());
-    client.check_login(access).await.map_err(map_any_err)?;
+    if let Some(access) = access {
+        client.check_login(access).await.map_err(map_any_err)?;
+    } else {
+        return Err("Not logged in".to_string());
+    }
     Ok("".to_string())
 }
 pub async fn get_username(user: UserPubKey) -> Result<String, String> {

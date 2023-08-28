@@ -19,7 +19,7 @@ fn main() {
                 .ok()
                 .flatten()
                 .and_then(|value| serde_json::from_str::<Option<AccessRequest>>(&value).ok())
-                .unwrap()
+                .unwrap_or(None)
         });
         set_access.set(storage_access);
         create_effect(move |_| {
@@ -31,7 +31,7 @@ fn main() {
                 }
             }
         });
-        let check_login = create_local_resource(move || access.get().unwrap(), check_login);
+        let check_login = create_local_resource(move || access.get(), check_login);
 
         view! {
             <div id="root">
