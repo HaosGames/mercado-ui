@@ -45,7 +45,7 @@ pub fn Navi(
                             <ul role="listbox">
                                 <li><a>"Edit user"</a></li>
                                 <li><a>"Predictions"</a></li>
-                                <li><a>"Bets"</a></li>
+                                <li><a href="/my_bets">"Bets"</a></li>
                                 <li><a>"Judges"</a></li>
                                 <li><a href="/" on:click=move |_| {set_access.set(None)} >"Logout"</a></li>
                             </ul>
@@ -287,4 +287,30 @@ pub fn Username(user: Option<UserPubKey>) -> impl IntoView {
             }
         }.into_view()
     }}
+}
+#[component]
+pub fn MyBets(access: ReadSignal<Option<AccessRequest>>) -> impl IntoView {
+    let bets = create_local_resource(move || access.get(), my_bets);
+
+    view! {
+        <table>
+            <tr>
+                <th>"Bet"</th>
+                <th>"Amount"</th>
+                <th>"Prediction"</th>
+                <th>"State"</th>
+                <th>"Actions"</th>
+            </tr>
+            <For each=move || bets.read().transpose().ok().flatten().unwrap_or_default() key=move |bet| bet.user
+            view=move |bet: Bet| view!{
+                <tr>
+                    <td>{bet.bet}</td>
+                    <td>{bet.amount.unwrap_or(0)}</td>
+                    <td>"Prediction"</td>
+                    <td>{bet.state.to_string()}</td>
+                    <td>""</td>
+                </tr>
+            }/>
+        </table>
+    }
 }

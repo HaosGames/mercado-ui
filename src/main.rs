@@ -45,6 +45,7 @@ fn main() {
                                 <Route path="" view=App/>
                             </Route>
                             <Route path="login" view=move || view! {<Login set_access=set_access />} />
+                            <Route path="my_bets" view=move || view!{<MyBets access=access />} />
                         </Routes>
                     </main>
                 </Router>

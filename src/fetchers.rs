@@ -102,3 +102,19 @@ pub async fn get_username(user: UserPubKey) -> Result<String, String> {
     let name = client().get_username(user).await.map_err(map_any_err)?;
     Ok(name)
 }
+pub async fn my_bets(access: Option<AccessRequest>) -> Result<Vec<Bet>, String> {
+    if let Some(access) = access {
+        client()
+            .get_bets(
+                PredictionUserRequest {
+                    prediction: None,
+                    user: Some(access.user),
+                },
+                access,
+            )
+            .await
+            .map_err(map_any_err)
+    } else {
+        Err("You need to login to see your bets".to_string())
+    }
+}
