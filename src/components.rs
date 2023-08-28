@@ -11,6 +11,58 @@ pub fn App() -> impl IntoView {
     }
 }
 #[component]
+pub fn Navi(
+    access: ReadSignal<Option<AccessRequest>>,
+    set_access: WriteSignal<Option<AccessRequest>>,
+) -> impl IntoView {
+    let check_login = create_local_resource(move || access.get(), check_login);
+    view! {
+        <nav class="container">
+            <ul>
+                <details role="list" >
+                    <summary aria-haspopup="listbox" role="link" >"New"</summary>
+                    <ul role="listbox">
+                        <li><a>"Prediction"</a></li>
+                        <li><a>"Bet"</a></li>
+                    </ul>
+                </details>
+            </ul>
+            <ul>
+            <li><a href="/"><strong>"Mercado"</strong></a></li>
+            </ul>
+            <ul><li>{
+                move || if access.get().is_some() && check_login.read().transpose().ok().flatten().is_some() {
+                    view!{
+
+                        <details role="list" >
+                            <summary aria-haspopup="listbox" role="link" ><Username user={
+                                if let Some(access) = access.get() {
+                                    Some(access.user)
+                                } else {
+                                    None
+                                }
+                            } /></summary>
+                            <ul role="listbox">
+                                <li><a>"Edit user"</a></li>
+                                <li><a>"Predictions"</a></li>
+                                <li><a>"Bets"</a></li>
+                                <li><a>"Judges"</a></li>
+                                <li><a href="/" on:click=move |_| {set_access.set(None)} >"Logout"</a></li>
+                            </ul>
+                        </details>
+                    }.into_view()
+                } else {
+                    view!{
+                        <a href="/login">"Login"</a>
+                    }.into_view()
+                }
+
+            }</li></ul>
+        </nav>
+
+    }
+}
+#[component]
 pub fn Login(set_access: WriteSignal<Option<AccessRequest>>) -> impl IntoView {
     let (user, set_user) = create_signal(String::from(""));
     let challenge = create_local_resource(move || user.get(), get_login_challenge);

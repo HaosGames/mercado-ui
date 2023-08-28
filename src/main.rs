@@ -1,4 +1,4 @@
-use crate::{components::*, fetchers::check_login};
+use crate::components::*;
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
@@ -31,54 +31,12 @@ fn main() {
                 }
             }
         });
-        let check_login = create_local_resource(move || access.get(), check_login);
 
         view! {
             <div id="root">
                 <Stylesheet href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css" />
                 <Router>
-                    <nav class="container">
-                        <ul>
-                            <details role="list" >
-                                <summary aria-haspopup="listbox" role="link" >"New"</summary>
-                                <ul role="listbox">
-                                    <li><a>"Prediction"</a></li>
-                                    <li><a>"Bet"</a></li>
-                                </ul>
-                            </details>
-                        </ul>
-                        <ul>
-                        <li><a href="/"><strong>"Mercado"</strong></a></li>
-                        </ul>
-                        <ul><li>{
-                            move || if access.get().is_some() && check_login.read().transpose().ok().flatten().is_some() {
-                                view!{
-
-                                    <details role="list" >
-                                        <summary aria-haspopup="listbox" role="link" ><Username user={
-                                            if let Some(access) = access.get() {
-                                                Some(access.user)
-                                            } else {
-                                                None
-                                            }
-                                        } /></summary>
-                                        <ul role="listbox">
-                                            <li><a>"Edit user"</a></li>
-                                            <li><a>"Predictions"</a></li>
-                                            <li><a>"Bets"</a></li>
-                                            <li><a>"Judges"</a></li>
-                                            <li><a href="/" on:click=move |_| {set_access.set(None)} >"Logout"</a></li>
-                                        </ul>
-                                    </details>
-                                }.into_view()
-                            } else {
-                                view!{
-                                    <a href="/login">"Login"</a>
-                                }.into_view()
-                            }
-
-                        }</li></ul>
-                    </nav>
+                    <Navi access=access set_access=set_access />
                     <main class="container">
                         <Routes>
                             <Route path="" view=App/>
