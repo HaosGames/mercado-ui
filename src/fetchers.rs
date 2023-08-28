@@ -43,7 +43,7 @@ pub async fn get_prediction_bets(request: PredictionRequest) -> Result<Vec<Bet>,
 }
 
 pub async fn accept_nomination(
-    request: AcceptNominationRequest,
+    request: NominationRequest,
     access: AccessRequest,
 ) -> Result<(), String> {
     let client = Client::new(URL.to_string());
@@ -53,7 +53,7 @@ pub async fn accept_nomination(
         .map_err(map_any_err)
 }
 pub async fn refuse_nomination(
-    request: AcceptNominationRequest,
+    request: NominationRequest,
     access: AccessRequest,
 ) -> Result<(), String> {
     let client = Client::new(URL.to_string());

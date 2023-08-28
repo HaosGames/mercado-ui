@@ -157,10 +157,10 @@ pub fn JudgeList(
 }
 #[component]
 pub fn JudgeListItem(judge: Judge, access: ReadSignal<Option<AccessRequest>>) -> impl IntoView {
-    let accept = create_action(|request: &PostRequest<AcceptNominationRequest>| {
+    let accept = create_action(|request: &PostRequest<NominationRequest>| {
         accept_nomination(request.data.clone(), request.access)
     });
-    let refuse = create_action(|request: &PostRequest<AcceptNominationRequest>| {
+    let refuse = create_action(|request: &PostRequest<NominationRequest>| {
         refuse_nomination(request.data.clone(), request.access)
     });
     view! {
@@ -170,13 +170,13 @@ pub fn JudgeListItem(judge: Judge, access: ReadSignal<Option<AccessRequest>>) ->
             <td>
                 <a href="#" role="button" class="outline" on:click=move |_|
                     accept.dispatch(PostRequest {
-                        data: AcceptNominationRequest {user: judge.user, prediction: judge.prediction},
+                        data: NominationRequest {user: judge.user, prediction: judge.prediction},
                         access: access.get().unwrap()})>
                     "Accept"
                 </a>
                 <a href="#" role="button" class="outline contrast" on:click=move |_|
                     refuse.dispatch(PostRequest {
-                        data: AcceptNominationRequest {user: judge.user, prediction: judge.prediction},
+                        data: NominationRequest {user: judge.user, prediction: judge.prediction},
                         access: access.get().unwrap()})>
                     "Refuse"
                 </a>
