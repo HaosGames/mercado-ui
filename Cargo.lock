@@ -1125,6 +1125,7 @@ dependencies = [
  "leptos_meta",
  "leptos_router",
  "mercado",
+ "serde",
  "serde_json",
  "web-sys",
 ]

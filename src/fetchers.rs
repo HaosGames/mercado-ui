@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use crate::URL;
+use crate::{MercadoState, URL};
 use leptos::{ReadSignal, SignalGetUntracked, SignalSet, WriteSignal};
 use mercado::api::*;
 use mercado::client::Client;
@@ -35,9 +35,9 @@ pub async fn get_judges(
 pub async fn get_judge(
     prediction: RowId,
     user: UserPubKey,
-    access: ReadSignal<Option<AccessRequest>>,
+    access: ReadSignal<MercadoState>,
 ) -> Result<Judge, String> {
-    if let Some(access) = access.get_untracked() {
+    if let Some(access) = access.get_untracked().access {
         let request = JudgeRequest { prediction, user };
         client()
             .get_judge(request, access)
@@ -82,31 +82,33 @@ pub async fn create_login_challenge(user: String) -> Result<String, String> {
         .map_err(map_any_err)
 }
 pub async fn try_login(
-    (user, signature, challenge, set_access): (
-        String,
-        String,
-        String,
-        WriteSignal<Option<AccessRequest>>,
-    ),
+    (user, signature, challenge, set_state): (String, String, String, WriteSignal<MercadoState>),
 ) -> Result<String, String> {
+    let user = UserPubKey::from_str(user.as_str())
+        .map_err(|e| e.into())
+        .map_err(map_any_err)?;
+    let sig = Signature::from_str(signature.as_str())
+        .map_err(|e| e.into())
+        .map_err(map_any_err)?;
     let request = LoginRequest {
-        user: UserPubKey::from_str(user.as_str())
-            .map_err(|e| e.into())
-            .map_err(map_any_err)?,
-        sig: Signature::from_str(signature.as_str())
-            .map_err(|e| e.into())
-            .map_err(map_any_err)?,
+        user,
+        sig,
         challenge,
     };
     client()
         .try_login(request.clone())
         .await
         .map_err(map_any_err)?;
-    set_access.set(Some(AccessRequest {
+    let access = AccessRequest {
         user: request.user,
         sig: request.sig,
         challenge: request.challenge,
-    }));
+    };
+    let user_detail = get_user(user, access.clone()).await?;
+    set_state.set(MercadoState {
+        access: Some(access.clone()),
+        user: Some(user_detail),
+    });
     Ok(format!("Successfull login as {}", user))
 }
 pub async fn check_login(access: Option<AccessRequest>) -> Result<String, String> {
@@ -120,6 +122,10 @@ pub async fn check_login(access: Option<AccessRequest>) -> Result<String, String
 pub async fn get_username(user: UserPubKey) -> Result<String, String> {
     let name = client().get_username(user).await.map_err(map_any_err)?;
     Ok(name)
+}
+pub async fn get_user(user: UserPubKey, access: AccessRequest) -> Result<UserResponse, String> {
+    let user = client().get_user(user, access).await.map_err(map_any_err)?;
+    Ok(user)
 }
 pub async fn my_bets(access: Option<AccessRequest>) -> Result<Vec<Bet>, String> {
     if let Some(access) = access {

@@ -1,5 +1,5 @@
 #![allow(non_snake_case)]
-use crate::fetchers::*;
+use crate::{fetchers::*, MercadoState};
 use leptos::{html::Input, *};
 use leptos_router::*;
 use mercado::api::*;
@@ -12,10 +12,10 @@ pub fn App() -> impl IntoView {
 }
 #[component]
 pub fn Navi(
-    access: ReadSignal<Option<AccessRequest>>,
-    set_access: WriteSignal<Option<AccessRequest>>,
+    state: ReadSignal<MercadoState>,
+    set_state: WriteSignal<MercadoState>,
 ) -> impl IntoView {
-    let check_login = create_local_resource(move || access.get(), check_login);
+    let check_login = create_local_resource(move || state.get().access, check_login);
     view! {
         <nav class="container">
             <ul>
@@ -31,11 +31,11 @@ pub fn Navi(
             <li><a href="/"><strong>"Mercado"</strong></a></li>
             </ul>
             <ul><li>{
-                move || if access.get().is_some() && check_login.read().transpose().ok().flatten().is_some() {
+                move || if state.get().access.is_some() && check_login.read().transpose().ok().flatten().is_some() {
                     view!{
                         <details role="list" >
                             <summary aria-haspopup="listbox" role="link" ><Username user={
-                                if let Some(access) = access.get() {
+                                if let Some(access) = state.get().access {
                                     Some(access.user)
                                 } else {
                                     None
@@ -46,7 +46,7 @@ pub fn Navi(
                                 <li><a>"Predictions"</a></li>
                                 <li><a href="/my_bets">"Bets"</a></li>
                                 <li><a>"Judges"</a></li>
-                                <li><a href="/" on:click=move |_| {set_access.set(None)} >"Logout"</a></li>
+                                <li><a href="/" on:click=move |_| {set_state.set(MercadoState::default())} >"Logout"</a></li>
                             </ul>
                         </details>
                     }.into_view()
@@ -60,7 +60,7 @@ pub fn Navi(
     }
 }
 #[component]
-pub fn Login(set_access: WriteSignal<Option<AccessRequest>>) -> impl IntoView {
+pub fn Login(set_state: WriteSignal<MercadoState>) -> impl IntoView {
     let (user, set_user) = create_signal(String::from(""));
     let challenge = create_local_resource(move || user.get(), create_login_challenge);
     let (signature, set_signature) = create_signal(String::from(""));
@@ -75,7 +75,7 @@ pub fn Login(set_access: WriteSignal<Option<AccessRequest>>) -> impl IntoView {
                     .ok()
                     .flatten()
                     .unwrap_or_default(),
-                set_access,
+                set_state,
             )
         },
         try_login,
@@ -164,19 +164,30 @@ pub fn UnwrapResourceForUser<F, V, T, R>(
     view: F,
     resource: R,
     user: UserPubKey,
-    access: ReadSignal<Option<AccessRequest>>,
+    state: ReadSignal<MercadoState>,
 ) -> impl IntoView
 where
     F: Fn(T) -> V + 'static,
     R: Fn() -> Option<Result<T, String>> + 'static,
     V: IntoView,
 {
-    if let Some(access) = access.get_untracked() {
-        if user == access.user {
-            view! {
-                <UnwrapResource resource=resource view=view />
+    if let Some(access) = state.get_untracked().access {
+        if let Some(storage_user) = state.get_untracked().user {
+            if let UserRole::User = storage_user.role {
+                if user == access.user {
+                    view! {
+                        <UnwrapResource resource=resource view=view />
+                    }
+                    .into_view()
+                } else {
+                    "".into_view()
+                }
+            } else {
+                view! {
+                    <UnwrapResource resource=resource view=view />
+                }
+                .into_view()
             }
-            .into_view()
         } else {
             "".into_view()
         }
@@ -186,7 +197,7 @@ where
 }
 
 #[component]
-pub fn PredictionOverview(access: ReadSignal<Option<AccessRequest>>) -> impl IntoView {
+pub fn PredictionOverview(state: ReadSignal<MercadoState>) -> impl IntoView {
     let params = use_params_map();
     let prediction = create_local_resource(
         move || params.with(|p| p.get("id").cloned().unwrap_or_default()),
@@ -200,7 +211,7 @@ pub fn PredictionOverview(access: ReadSignal<Option<AccessRequest>>) -> impl Int
             "Judge share: "{prediction.judge_share_ppm/10000}"%"<br/>
             "Decision period: "{prediction.decision_period_sec/86400}" days"<br/>
             </p>
-            <JudgeList prediction=prediction.id judge_count=prediction.judge_count access=access/>
+            <JudgeList prediction=prediction.id judge_count=prediction.judge_count state=state/>
             <BetList prediction=prediction.id user=None />
             <p>"Id: "{prediction.id}</p>
         } />
@@ -210,7 +221,7 @@ pub fn PredictionOverview(access: ReadSignal<Option<AccessRequest>>) -> impl Int
 pub fn JudgeList(
     prediction: RowId,
     judge_count: u32,
-    access: ReadSignal<Option<AccessRequest>>,
+    state: ReadSignal<MercadoState>,
 ) -> impl IntoView {
     let judges = create_local_resource(
         move || prediction,
@@ -230,7 +241,7 @@ pub fn JudgeList(
                     </tr>
                     <For each=move || judges.clone() key=move |judge| judge.user
                     view=move |judge: JudgePublic| view!{
-                        <JudgeListItem judge=judge access=access />
+                        <JudgeListItem judge=judge state=state />
                     }/>
                 </table>
             </details>
@@ -238,10 +249,7 @@ pub fn JudgeList(
     }
 }
 #[component]
-pub fn JudgeListItem(
-    judge: JudgePublic,
-    access: ReadSignal<Option<AccessRequest>>,
-) -> impl IntoView {
+pub fn JudgeListItem(judge: JudgePublic, state: ReadSignal<MercadoState>) -> impl IntoView {
     let accept = create_action(|request: &PostRequest<NominationRequest>| {
         accept_nomination(request.data.clone(), request.access.clone())
     });
@@ -251,26 +259,26 @@ pub fn JudgeListItem(
     let (count, set_count) = create_signal(0);
     let judge_priv = create_local_resource(
         move || count.get(),
-        move |_| get_judge(judge.prediction, judge.user, access),
+        move |_| get_judge(judge.prediction, judge.user, state),
     );
     view! {
         <tr>
             <td>{move || judge.user.to_string()}</td>
             <td><UnwrapResourceForUser
                 user=judge.user
-                access=access
+                state=state
                 resource=move || judge_priv.read()
                 view=move |judge| judge.state.to_string()
             /></td>
             <td><UnwrapResourceForUser
                 user=judge.user
-                access=access
+                state=state
                 resource=move || judge_priv.read()
                 view= move |judge| view! {
                 <a href="#" role="button" class="outline" on:click=move |_| {
                     accept.dispatch(PostRequest {
                         data: NominationRequest {user: judge.user, prediction: judge.prediction},
-                        access: access.get().unwrap()});
+                        access: state.get().access.unwrap()});
                     set_count.set(count.get() + 1);
                 }>
                     "Accept"
@@ -278,7 +286,7 @@ pub fn JudgeListItem(
                 <a href="#" role="button" class="outline contrast" on:click=move |_| {
                     refuse.dispatch(PostRequest {
                         data: NominationRequest {user: judge.user, prediction: judge.prediction},
-                        access: access.get().unwrap()});
+                        access: state.get().access.unwrap()});
                     set_count.set(count.get() + 1);
                 }>
                     "Refuse"
@@ -341,8 +349,8 @@ pub fn Username(user: Option<UserPubKey>) -> impl IntoView {
     }}
 }
 #[component]
-pub fn MyBets(access: ReadSignal<Option<AccessRequest>>) -> impl IntoView {
-    let bets = create_local_resource(move || access.get(), my_bets);
+pub fn MyBets(access: ReadSignal<MercadoState>) -> impl IntoView {
+    let bets = create_local_resource(move || access.get().access, my_bets);
 
     view! {
         <table>
