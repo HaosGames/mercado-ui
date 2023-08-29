@@ -199,10 +199,9 @@ where
 #[component]
 pub fn PredictionOverview(state: ReadSignal<MercadoState>) -> impl IntoView {
     let params = use_params_map();
-    let prediction = create_local_resource(
-        move || params.with(|p| p.get("id").cloned().unwrap_or_default()),
-        move |id| get_prediction_overview(id.parse().unwrap_or_default()),
-    );
+    let id = move || params.with(|p| p.get("id").cloned());
+    let id = move || id().unwrap_or_default().parse::<RowId>().unwrap();
+    let prediction = create_local_resource(move || id(), move |id| get_prediction_overview(id));
     view! {
         <UnwrapResource resource=move || prediction.read() view=move |prediction| view! {
             <h3>{prediction.name}</h3>
