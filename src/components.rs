@@ -153,6 +153,23 @@ pub fn PredictionList() -> impl IntoView {
         </div>
     }
 }
+#[component]
+pub fn Unwrap<F, V, T, W>(view: F, t: W) -> impl IntoView
+where
+    F: Fn(T) -> V + 'static,
+    W: Fn() -> Option<Result<T, String>> + 'static,
+    V: IntoView,
+{
+    view! {
+        {
+            move || match t() {
+                None => view! {<p>"Loading..."</p>}.into_view(),
+                Some(Ok(t)) => view(t).into_view(),
+                Some(Err(e)) => view! {<p>{format!("Got error: {:?}", e)}</p>}.into_view(),
+            }
+        }
+    }
+}
 
 #[component]
 pub fn PredictionOverview(access: ReadSignal<Option<AccessRequest>>) -> impl IntoView {
@@ -176,6 +193,7 @@ pub fn PredictionOverview(access: ReadSignal<Option<AccessRequest>>) -> impl Int
                         </p>
                         <JudgeList prediction=prediction.id judge_count=prediction.judge_count access=access/>
                         <BetList prediction=prediction.id user=None />
+                        <p>"Id: "{prediction.id}</p>
                     </div>
                 }.into_view(),
                 Some(Err(e)) => view! {<p>{format!("Got error: {:?}", e)}</p>}.into_view(),
@@ -193,7 +211,7 @@ pub fn JudgeList(
 ) -> impl IntoView {
     let judges = create_local_resource(
         move || prediction,
-        move |prediction| get_prediction_judges(prediction),
+        move |prediction| get_judges(Some(prediction), None),
     );
     view! {
         {
@@ -209,7 +227,7 @@ pub fn JudgeList(
                                 <th>"Actions"</th>
                             </tr>
                             <For each=move || judges.clone() key=move |judge| judge.user
-                            view=move |judge: Judge| view!{
+                            view=move |judge: JudgePublic| view!{
                                 <JudgeListItem judge=judge access=access />
                             }/>
                         </table>
@@ -222,30 +240,44 @@ pub fn JudgeList(
     }
 }
 #[component]
-pub fn JudgeListItem(judge: Judge, access: ReadSignal<Option<AccessRequest>>) -> impl IntoView {
+pub fn JudgeListItem(
+    judge: JudgePublic,
+    access: ReadSignal<Option<AccessRequest>>,
+) -> impl IntoView {
     let accept = create_action(|request: &PostRequest<NominationRequest>| {
         accept_nomination(request.data.clone(), request.access.clone())
     });
     let refuse = create_action(|request: &PostRequest<NominationRequest>| {
         refuse_nomination(request.data.clone(), request.access.clone())
     });
+    let (count, set_count) = create_signal(0);
+    let judge_priv = create_local_resource(
+        move || count.get(),
+        move |_| get_judge(judge.prediction, judge.user, access),
+    );
     view! {
         <tr>
             <td>{move || judge.user.to_string()}</td>
-            <td>{move || judge.state.to_string()}</td>
-            <td>
-                <a href="#" role="button" class="outline" on:click=move |_|
+            <td><Unwrap t=move || judge_priv.read() view=move |judge| judge.state.to_string() /></td>
+            <td><Unwrap t=move || judge_priv.read() view= move |judge| view! {
+                <a href="#" role="button" class="outline" on:click=move |_| {
                     accept.dispatch(PostRequest {
                         data: NominationRequest {user: judge.user, prediction: judge.prediction},
-                        access: access.get().unwrap()})>
+                        access: access.get().unwrap()});
+                    set_count.set(count.get() + 1);
+                }>
                     "Accept"
                 </a>
-                <a href="#" role="button" class="outline contrast" on:click=move |_|
+                <a href="#" role="button" class="outline contrast" on:click=move |_| {
                     refuse.dispatch(PostRequest {
                         data: NominationRequest {user: judge.user, prediction: judge.prediction},
-                        access: access.get().unwrap()})>
+                        access: access.get().unwrap()});
+                    set_count.set(count.get() + 1);
+                }>
                     "Refuse"
                 </a>
+
+            } />
             </td>
         </tr>
     }

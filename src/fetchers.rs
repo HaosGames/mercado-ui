@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use crate::URL;
-use leptos::{SignalSet, WriteSignal};
+use leptos::{ReadSignal, SignalGetUntracked, SignalSet, WriteSignal};
 use mercado::api::*;
 use mercado::client::Client;
 use mercado::secp256k1::ecdsa::Signature;
@@ -25,15 +25,27 @@ pub async fn get_prediction_overview(
         .await
         .map_err(map_any_err)
 }
-pub async fn get_prediction_judges(prediction: RowId) -> Result<Vec<Judge>, String> {
-    let request = PredictionRequest {
-        user: None,
-        prediction,
-    };
-    client()
-        .get_prediction_judges(request)
-        .await
-        .map_err(map_any_err)
+pub async fn get_judges(
+    prediction: Option<RowId>,
+    user: Option<UserPubKey>,
+) -> Result<Vec<JudgePublic>, String> {
+    let request = PredictionUserRequest { user, prediction };
+    client().get_judges(request).await.map_err(map_any_err)
+}
+pub async fn get_judge(
+    prediction: RowId,
+    user: UserPubKey,
+    access: ReadSignal<Option<AccessRequest>>,
+) -> Result<Judge, String> {
+    if let Some(access) = access.get_untracked() {
+        let request = JudgeRequest { prediction, user };
+        client()
+            .get_judge(request, access)
+            .await
+            .map_err(map_any_err)
+    } else {
+        Err("Not logged in".to_string())
+    }
 }
 pub async fn get_prediction_bets(request: PredictionRequest) -> Result<Vec<Bet>, String> {
     client()
