@@ -124,7 +124,7 @@ pub fn PredictionList() -> impl IntoView {
     let predictions = create_local_resource(move || {}, get_predictions);
 
     view! {
-        <UnwrapResource t=move || predictions.read() view=move |mut predictions| view! {
+        <UnwrapResource resource=move || predictions.read() view=move |mut predictions| view! {
             <p>{predictions.len()}" prediction(s)"</p>
             <table role="grid">
                 <tr>
@@ -143,20 +143,45 @@ pub fn PredictionList() -> impl IntoView {
     }
 }
 #[component]
-pub fn UnwrapResource<F, V, T, W>(view: F, t: W) -> impl IntoView
+pub fn UnwrapResource<F, V, T, R>(view: F, resource: R) -> impl IntoView
 where
     F: Fn(T) -> V + 'static,
-    W: Fn() -> Option<Result<T, String>> + 'static,
+    R: Fn() -> Option<Result<T, String>> + 'static,
     V: IntoView,
 {
     view! {
         {
-            move || match t() {
+            move || match resource() {
                 None => view! {<p>"Loading..."</p>}.into_view(),
                 Some(Ok(t)) => view(t).into_view(),
                 Some(Err(e)) => view! {<p>{format!("{:?}", e)}</p>}.into_view(),
             }
         }
+    }
+}
+#[component]
+pub fn UnwrapResourceForUser<F, V, T, R>(
+    view: F,
+    resource: R,
+    user: UserPubKey,
+    access: ReadSignal<Option<AccessRequest>>,
+) -> impl IntoView
+where
+    F: Fn(T) -> V + 'static,
+    R: Fn() -> Option<Result<T, String>> + 'static,
+    V: IntoView,
+{
+    if let Some(access) = access.get_untracked() {
+        if user == access.user {
+            view! {
+                <UnwrapResource resource=resource view=view />
+            }
+            .into_view()
+        } else {
+            "".into_view()
+        }
+    } else {
+        "".into_view()
     }
 }
 
@@ -168,7 +193,7 @@ pub fn PredictionOverview(access: ReadSignal<Option<AccessRequest>>) -> impl Int
         move |id| get_prediction_overview(id.parse().unwrap_or_default()),
     );
     view! {
-        <UnwrapResource t=move || prediction.read() view=move |prediction| view! {
+        <UnwrapResource resource=move || prediction.read() view=move |prediction| view! {
             <h3>{prediction.name}</h3>
             <p>"State: "{prediction.state.to_string()}<br/>
             "End: "{prediction.trading_end.to_string()}<br/>
@@ -192,28 +217,24 @@ pub fn JudgeList(
         move |prediction| get_judges(Some(prediction), None),
     );
     view! {
-        {
-            move || match judges.read() {
-                None => view! {<p>"Loading..."</p>}.into_view(),
-                Some(Ok(judges)) => view! {
-                    <details open>
-                        <summary>{format!("Judges: {}/{}", judge_count, judges.len())}</summary>
-                        <table>
-                            <tr>
-                                <th>"Judge"</th>
-                                <th>"State"</th>
-                                <th>"Actions"</th>
-                            </tr>
-                            <For each=move || judges.clone() key=move |judge| judge.user
-                            view=move |judge: JudgePublic| view!{
-                                <JudgeListItem judge=judge access=access />
-                            }/>
-                        </table>
-                    </details>
-                }.into_view(),
-                Some(Err(e)) => view! {<p>{format!("Got error: {:?}", e)}</p>}.into_view(),
-            }
-        }
+        <UnwrapResource
+            resource=move || judges.read()
+            view=move |judges| view! {
+            <details open>
+                <summary>{format!("Judges: {}/{}", judge_count, judges.len())}</summary>
+                <table>
+                    <tr>
+                        <th>"Judge"</th>
+                        <th>"State"</th>
+                        <th>"Actions"</th>
+                    </tr>
+                    <For each=move || judges.clone() key=move |judge| judge.user
+                    view=move |judge: JudgePublic| view!{
+                        <JudgeListItem judge=judge access=access />
+                    }/>
+                </table>
+            </details>
+        } />
     }
 }
 #[component]
@@ -235,8 +256,17 @@ pub fn JudgeListItem(
     view! {
         <tr>
             <td>{move || judge.user.to_string()}</td>
-            <td><UnwrapResource t=move || judge_priv.read() view=move |judge| judge.state.to_string() /></td>
-            <td><UnwrapResource t=move || judge_priv.read() view= move |judge| view! {
+            <td><UnwrapResourceForUser
+                user=judge.user
+                access=access
+                resource=move || judge_priv.read()
+                view=move |judge| judge.state.to_string()
+            /></td>
+            <td><UnwrapResourceForUser
+                user=judge.user
+                access=access
+                resource=move || judge_priv.read()
+                view= move |judge| view! {
                 <a href="#" role="button" class="outline" on:click=move |_| {
                     accept.dispatch(PostRequest {
                         data: NominationRequest {user: judge.user, prediction: judge.prediction},
