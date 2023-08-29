@@ -60,17 +60,22 @@ pub async fn refuse_nomination(
         .await
         .map_err(map_any_err)
 }
-pub async fn get_login_challenge(user: String) -> Result<String, String> {
+pub async fn create_login_challenge(user: String) -> Result<String, String> {
     let user = UserPubKey::from_str(user.as_str())
         .map_err(|e| e.into())
         .map_err(map_any_err)?;
     client()
-        .get_login_challenge(user)
+        .create_login_challenge(user)
         .await
         .map_err(map_any_err)
 }
 pub async fn try_login(
-    (user, signature, set_access): (String, String, WriteSignal<Option<AccessRequest>>),
+    (user, signature, challenge, set_access): (
+        String,
+        String,
+        String,
+        WriteSignal<Option<AccessRequest>>,
+    ),
 ) -> Result<String, String> {
     let request = LoginRequest {
         user: UserPubKey::from_str(user.as_str())
@@ -79,6 +84,7 @@ pub async fn try_login(
         sig: Signature::from_str(signature.as_str())
             .map_err(|e| e.into())
             .map_err(map_any_err)?,
+        challenge,
     };
     client()
         .try_login(request.clone())
@@ -87,6 +93,7 @@ pub async fn try_login(
     set_access.set(Some(AccessRequest {
         user: request.user,
         sig: request.sig,
+        challenge: request.challenge,
     }));
     Ok(format!("Successfull login as {}", user))
 }

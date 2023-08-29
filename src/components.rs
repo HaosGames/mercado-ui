@@ -65,10 +65,24 @@ pub fn Navi(
 #[component]
 pub fn Login(set_access: WriteSignal<Option<AccessRequest>>) -> impl IntoView {
     let (user, set_user) = create_signal(String::from(""));
-    let challenge = create_local_resource(move || user.get(), get_login_challenge);
+    let challenge = create_local_resource(move || user.get(), create_login_challenge);
     let (signature, set_signature) = create_signal(String::from(""));
-    let result =
-        create_local_resource(move || (user.get(), signature.get(), set_access), try_login);
+    let result = create_local_resource(
+        move || {
+            (
+                user.get(),
+                signature.get(),
+                challenge
+                    .read()
+                    .transpose()
+                    .ok()
+                    .flatten()
+                    .unwrap_or_default(),
+                set_access,
+            )
+        },
+        try_login,
+    );
 
     let user_input: NodeRef<Input> = create_node_ref();
     let signature_input: NodeRef<Input> = create_node_ref();
@@ -210,10 +224,10 @@ pub fn JudgeList(
 #[component]
 pub fn JudgeListItem(judge: Judge, access: ReadSignal<Option<AccessRequest>>) -> impl IntoView {
     let accept = create_action(|request: &PostRequest<NominationRequest>| {
-        accept_nomination(request.data.clone(), request.access)
+        accept_nomination(request.data.clone(), request.access.clone())
     });
     let refuse = create_action(|request: &PostRequest<NominationRequest>| {
-        refuse_nomination(request.data.clone(), request.access)
+        refuse_nomination(request.data.clone(), request.access.clone())
     });
     view! {
         <tr>
