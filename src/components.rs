@@ -33,7 +33,6 @@ pub fn Navi(
             <ul><li>{
                 move || if access.get().is_some() && check_login.read().transpose().ok().flatten().is_some() {
                     view!{
-
                         <details role="list" >
                             <summary aria-haspopup="listbox" role="link" ><Username user={
                                 if let Some(access) = access.get() {
@@ -56,10 +55,8 @@ pub fn Navi(
                         <a href="/login">"Login"</a>
                     }.into_view()
                 }
-
             }</li></ul>
         </nav>
-
     }
 }
 #[component]
@@ -127,34 +124,26 @@ pub fn PredictionList() -> impl IntoView {
     let predictions = create_local_resource(move || {}, get_predictions);
 
     view! {
-        <div>
-        {
-            move || match predictions.read() {
-                None => view! {<p>"Loading..."</p>}.into_view(),
-                Some(Ok(mut predictions)) => view! {
-                    <p>{predictions.len()}" prediction(s)"</p>
-                    <table role="grid">
-                        <tr>
-                           <th>"Prediction"</th>
-                           <th>"End"</th>
-                           <th>"Judge Share"</th>
-                        </tr>
-                        {
-                            predictions.sort_by(|a, b| a.id.cmp(&b.id));
-                            predictions.into_iter()
-                            .map(|prediction| view! {<PredictionListItem prediction=prediction/>})
-                            .collect::<Vec<_>>()
-                        }
-                    </table>
-                }.into_view(),
-                Some(Err(e)) => view! {<p>{format!("Got error: {:?}", e)}</p>}.into_view(),
-            }
-        }
-        </div>
+        <UnwrapResource t=move || predictions.read() view=move |mut predictions| view! {
+            <p>{predictions.len()}" prediction(s)"</p>
+            <table role="grid">
+                <tr>
+                   <th>"Prediction"</th>
+                   <th>"End"</th>
+                   <th>"Judge Share"</th>
+                </tr>
+                {
+                    predictions.sort_by(|a, b| a.id.cmp(&b.id));
+                    predictions.into_iter()
+                    .map(|prediction| view! {<PredictionListItem prediction=prediction/>})
+                    .collect::<Vec<_>>()
+                }
+            </table>
+        } />
     }
 }
 #[component]
-pub fn Unwrap<F, V, T, W>(view: F, t: W) -> impl IntoView
+pub fn UnwrapResource<F, V, T, W>(view: F, t: W) -> impl IntoView
 where
     F: Fn(T) -> V + 'static,
     W: Fn() -> Option<Result<T, String>> + 'static,
@@ -165,7 +154,7 @@ where
             move || match t() {
                 None => view! {<p>"Loading..."</p>}.into_view(),
                 Some(Ok(t)) => view(t).into_view(),
-                Some(Err(e)) => view! {<p>{format!("Got error: {:?}", e)}</p>}.into_view(),
+                Some(Err(e)) => view! {<p>{format!("{:?}", e)}</p>}.into_view(),
             }
         }
     }
@@ -179,28 +168,17 @@ pub fn PredictionOverview(access: ReadSignal<Option<AccessRequest>>) -> impl Int
         move |id| get_prediction_overview(id.parse().unwrap_or_default()),
     );
     view! {
-        <div>
-        {
-            move || match prediction.read() {
-                None => view! {<p>"Loading..."</p>}.into_view(),
-                Some(Ok(prediction)) => view! {
-                    <div>
-                        <h3>{prediction.name}</h3>
-                        <p>"State: "{prediction.state.to_string()}<br/>
-                        "End: "{prediction.trading_end.to_string()}<br/>
-                        "Judge share: "{prediction.judge_share_ppm/10000}"%"<br/>
-                        "Decision period: "{prediction.decision_period_sec/86400}" days"<br/>
-                        </p>
-                        <JudgeList prediction=prediction.id judge_count=prediction.judge_count access=access/>
-                        <BetList prediction=prediction.id user=None />
-                        <p>"Id: "{prediction.id}</p>
-                    </div>
-                }.into_view(),
-                Some(Err(e)) => view! {<p>{format!("Got error: {:?}", e)}</p>}.into_view(),
-            }
-        }
-        </div>
-
+        <UnwrapResource t=move || prediction.read() view=move |prediction| view! {
+            <h3>{prediction.name}</h3>
+            <p>"State: "{prediction.state.to_string()}<br/>
+            "End: "{prediction.trading_end.to_string()}<br/>
+            "Judge share: "{prediction.judge_share_ppm/10000}"%"<br/>
+            "Decision period: "{prediction.decision_period_sec/86400}" days"<br/>
+            </p>
+            <JudgeList prediction=prediction.id judge_count=prediction.judge_count access=access/>
+            <BetList prediction=prediction.id user=None />
+            <p>"Id: "{prediction.id}</p>
+        } />
     }
 }
 #[component]
@@ -234,7 +212,6 @@ pub fn JudgeList(
                     </details>
                 }.into_view(),
                 Some(Err(e)) => view! {<p>{format!("Got error: {:?}", e)}</p>}.into_view(),
-
             }
         }
     }
@@ -258,8 +235,8 @@ pub fn JudgeListItem(
     view! {
         <tr>
             <td>{move || judge.user.to_string()}</td>
-            <td><Unwrap t=move || judge_priv.read() view=move |judge| judge.state.to_string() /></td>
-            <td><Unwrap t=move || judge_priv.read() view= move |judge| view! {
+            <td><UnwrapResource t=move || judge_priv.read() view=move |judge| judge.state.to_string() /></td>
+            <td><UnwrapResource t=move || judge_priv.read() view= move |judge| view! {
                 <a href="#" role="button" class="outline" on:click=move |_| {
                     accept.dispatch(PostRequest {
                         data: NominationRequest {user: judge.user, prediction: judge.prediction},
@@ -276,7 +253,6 @@ pub fn JudgeListItem(
                 }>
                     "Refuse"
                 </a>
-
             } />
             </td>
         </tr>
