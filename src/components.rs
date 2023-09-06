@@ -31,7 +31,7 @@ pub fn Navi(
             <li><a href="/"><strong>"Mercado"</strong></a></li>
             </ul>
             <ul><li>{
-                move || if state.get().access.is_some() && check_login.read().transpose().ok().flatten().is_some() {
+                move || if state.get().access.is_some() && check_login.get().transpose().ok().flatten().is_some() {
                     view!{
                         <details role="list" >
                             <summary aria-haspopup="listbox" role="link" ><Username user={
@@ -70,7 +70,7 @@ pub fn Login(set_state: WriteSignal<MercadoState>) -> impl IntoView {
                 user.get(),
                 signature.get(),
                 challenge
-                    .read()
+                    .get()
                     .transpose()
                     .ok()
                     .flatten()
@@ -95,7 +95,7 @@ pub fn Login(set_state: WriteSignal<MercadoState>) -> impl IntoView {
                 let value = user_input.get().unwrap().value();
                 set_user.set(value);
             }>"Get singing challenge"</button>
-            <p>"Sign the following message: "{move || challenge.read().transpose().ok().flatten()}</p>
+            <p>"Sign the following message: "{move || challenge.get().transpose().ok().flatten()}</p>
             <label>"ECDSA Signature: "<input
                 type="text"
                 value=move || signature.get()
@@ -105,7 +105,7 @@ pub fn Login(set_state: WriteSignal<MercadoState>) -> impl IntoView {
                 let value = signature_input.get().unwrap().value();
                 set_signature.set(value);
             }>"Login"</button>
-            <p>{move || result.read().transpose().ok().flatten() }</p>
+            <p>{move || result.get().transpose().ok().flatten() }</p>
         </div>
     }
 }
@@ -124,7 +124,7 @@ pub fn PredictionList() -> impl IntoView {
     let predictions = create_local_resource(move || {}, get_predictions);
 
     view! {
-        <UnwrapResource resource=move || predictions.read() view=move |mut predictions| view! {
+        <UnwrapResource resource=move || predictions.get() view=move |mut predictions| view! {
             <p>{predictions.len()}" prediction(s)"</p>
             <table role="grid">
                 <tr>
@@ -203,7 +203,7 @@ pub fn PredictionOverview(state: ReadSignal<MercadoState>) -> impl IntoView {
     let id = move || id().unwrap_or_default().parse::<RowId>().unwrap();
     let prediction = create_local_resource(move || id(), move |id| get_prediction_overview(id));
     view! {
-        <UnwrapResource resource=move || prediction.read() view=move |prediction| view! {
+        <UnwrapResource resource=move || prediction.get() view=move |prediction| view! {
             <h3>{prediction.name}</h3>
             <p>"State: "{prediction.state.to_string()}<br/>
             "End: "{prediction.trading_end.to_string()}<br/>
@@ -228,7 +228,7 @@ pub fn JudgeList(
     );
     view! {
         <UnwrapResource
-            resource=move || judges.read()
+            resource=move || judges.get()
             view=move |judges| view! {
             <details open>
                 <summary>{format!("Judges: {}/{}", judge_count, judges.len())}</summary>
@@ -266,13 +266,13 @@ pub fn JudgeListItem(judge: JudgePublic, state: ReadSignal<MercadoState>) -> imp
             <td><UnwrapResourceForUser
                 user=judge.user
                 state=state
-                resource=move || judge_priv.read()
+                resource=move || judge_priv.get()
                 view=move |judge| judge.state.to_string()
             /></td>
             <td><UnwrapResourceForUser
                 user=judge.user
                 state=state
-                resource=move || judge_priv.read()
+                resource=move || judge_priv.get()
                 view= move |judge| view! {
                 <a href="#" role="button" class="outline" on:click=move |_| {
                     accept.dispatch(PostRequest {
@@ -303,7 +303,7 @@ pub fn BetList(prediction: RowId, user: Option<UserPubKey>) -> impl IntoView {
     );
     view! {
         {
-            move || match bets.read() {
+            move || match bets.get() {
                 None => view! {<p>"Loading..."</p>}.into_view(),
                 Some(Ok(bets)) => view! {
                     <details>
@@ -337,7 +337,7 @@ pub fn Username(user: Option<UserPubKey>) -> impl IntoView {
     view! {{
         move || {
             if let Some(user) = user {
-                let name = usernames.read().transpose().ok().flatten().unwrap_or_default();
+                let name = usernames.get().transpose().ok().flatten().unwrap_or_default();
                 if name.is_empty() {
                     user.to_string()
                 } else {name}
@@ -360,7 +360,7 @@ pub fn MyBets(access: ReadSignal<MercadoState>) -> impl IntoView {
                 <th>"State"</th>
                 <th>"Actions"</th>
             </tr>
-            <For each=move || bets.read().transpose().ok().flatten().unwrap_or_default() key=move |bet| bet.user
+            <For each=move || bets.get().transpose().ok().flatten().unwrap_or_default() key=move |bet| bet.user
             view=move |bet: Bet| view!{
                 <tr>
                     <td>{bet.bet}</td>
