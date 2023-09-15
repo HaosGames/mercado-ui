@@ -40,7 +40,7 @@ fn main() {
                 let json =
                     serde_json::to_string(&state.get()).expect("couldn't serialize AccessRequest");
                 if storage.set_item(STORAGE_KEY, &json).is_err() {
-                    error!("error while trying to set item in localStorage");
+                    log::error!("error while trying to set item in localStorage");
                 }
             }
         });
