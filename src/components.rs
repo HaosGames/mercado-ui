@@ -113,7 +113,7 @@ pub fn Login(set_state: WriteSignal<MercadoState>) -> impl IntoView {
 pub fn PredictionListItem(prediction: PredictionOverviewResponse) -> impl IntoView {
     view! {
         <tr>
-            <td><a href={format!("prediction/{}", prediction.id)}>{prediction.name}</a></td>
+            <td><a href={format!("/prediction/{}", prediction.id)}>{prediction.name}</a></td>
             <td>{prediction.trading_end.to_string()}</td>
             <td>{prediction.judge_share_ppm / 10000}"%"</td>
         </tr>
