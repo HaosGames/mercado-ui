@@ -262,7 +262,7 @@ pub fn JudgeListItem(judge: JudgePublic, state: ReadSignal<MercadoState>) -> imp
     );
     view! {
         <tr>
-            <td>{move || judge.user.to_string()}</td>
+            <td><Username user= Some(judge.user) /></td>
             <td><UnwrapResourceForUser
                 user=judge.user
                 state=state
