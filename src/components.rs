@@ -1,5 +1,7 @@
 #![allow(non_snake_case)]
 use crate::{fetchers::*, MercadoState};
+use chrono::offset::Utc;
+use chrono::DateTime;
 use leptos::{html::Input, *};
 use leptos_router::*;
 use mercado::api::*;
@@ -22,7 +24,7 @@ pub fn Navi(
                 <details role="list" >
                     <summary aria-haspopup="listbox" role="link" >"New"</summary>
                     <ul role="listbox">
-                        <li><a>"Prediction"</a></li>
+                        <li><a href="/new_prediction">"Prediction"</a></li>
                         <li><a>"Bet"</a></li>
                     </ul>
                 </details>
@@ -371,5 +373,35 @@ pub fn MyBets(access: ReadSignal<MercadoState>) -> impl IntoView {
                 </tr>
             }/>
         </table>
+    }
+}
+#[component]
+pub fn StringInput(set: WriteSignal<String>) -> impl IntoView {
+    view! {
+        <input type="text"
+            on:input=move |e| {
+                set.set(event_target_value(&e));
+            }
+        />
+    }
+}
+#[component]
+pub fn NewPrediction(state: ReadSignal<MercadoState>) -> impl IntoView {
+    let (prediction, set_prediction) = create_signal(String::new());
+    let (end, set_end) = create_signal(String::new());
+    let parsed_end = move || (end.get() + ":00Z").parse::<DateTime<Utc>>();
+    let display_end = move || match parsed_end() {
+        Ok(parsed) => parsed.to_string().into_view(),
+        Err(_e) => "".into_view(),
+    };
+
+    view! {
+        <div>
+            <h3>"Create a new prediction"</h3>
+            <label>"Prediction"</label>
+            <StringInput set=set_prediction />
+            <label>"Ends at "{display_end}</label>
+            <input type="datetime-local" on:input=move |e| { set_end.set(event_target_value(&e)); } />
+        </div>
     }
 }
