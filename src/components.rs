@@ -1,10 +1,13 @@
 #![allow(non_snake_case)]
 use crate::{fetchers::*, MercadoState};
-use chrono::offset::Utc;
 use chrono::DateTime;
+use chrono::{offset::Utc, Duration};
 use leptos::{html::Input, *};
 use leptos_router::*;
-use mercado::api::*;
+use mercado::{
+    api::*,
+    secp256k1::{generate_keypair, rand},
+};
 
 #[component]
 pub fn App() -> impl IntoView {
@@ -341,12 +344,14 @@ pub fn Username(user: Option<UserPubKey>) -> impl IntoView {
             if let Some(user) = user {
                 let name = usernames.get().transpose().ok().flatten().unwrap_or_default();
                 if name.is_empty() {
-                    user.to_string()
-                } else {name}
+                    user.to_string().into_view()
+                } else {
+                    view! {<span title={user.to_string()} >{name}</span>}.into_view()
+                }
             } else {
-                "User".to_string()
+                "User".to_string().into_view()
             }
-        }.into_view()
+        }
     }}
 }
 #[component]
@@ -376,19 +381,16 @@ pub fn MyBets(access: ReadSignal<MercadoState>) -> impl IntoView {
     }
 }
 #[component]
-pub fn StringInput(set: WriteSignal<String>) -> impl IntoView {
-    view! {
-        <input type="text"
-            on:input=move |e| {
-                set.set(event_target_value(&e));
-            }
-        />
-    }
-}
-#[component]
 pub fn NewPrediction(state: ReadSignal<MercadoState>) -> impl IntoView {
-    let (prediction, set_prediction) = create_signal(String::new());
-    let (end, set_end) = create_signal(String::new());
+    let (prediction, set_prediction) = create_signal(String::from("This works"));
+    let (end, set_end) = create_signal(String::from(
+        (Utc::now() + Duration::days(1)).to_rfc3339().split_at(16).0,
+    ));
+    let (judge_count, set_judge_count) = create_signal("3".to_string());
+    let (judges, set_judges) = create_signal::<Vec<UserPubKey>>(vec![]);
+    let (new_judge, set_new_judge) =
+        create_signal(generate_keypair(&mut rand::thread_rng()).1.to_string());
+
     let parsed_end = move || (end.get() + ":00Z").parse::<DateTime<Utc>>();
     let display_end = move || match parsed_end() {
         Ok(parsed) => parsed.to_string().into_view(),
@@ -399,9 +401,44 @@ pub fn NewPrediction(state: ReadSignal<MercadoState>) -> impl IntoView {
         <div>
             <h3>"Create a new prediction"</h3>
             <label>"Prediction"</label>
-            <StringInput set=set_prediction />
+            <input type="text"
+                on:input=move |e| {
+                    set_prediction.set(event_target_value(&e));
+                }
+                value={prediction}
+            />
             <label>"Ends at "{display_end}</label>
-            <input type="datetime-local" on:input=move |e| { set_end.set(event_target_value(&e)); } />
+            <input type="datetime-local" on:input=move |e| { set_end.set(event_target_value(&e)); } value={end}/>
+            <label>"How many judges need to participate?"</label>
+            <input type="number" on:input=move |e| { set_judge_count.set(event_target_value(&e)) } value={judge_count}/>
+            <p>"Judges: "
+                <input type="text" on:input=move |e| {set_new_judge.set(event_target_value(&e)) } value={new_judge}/>
+            <a href="#" role="button" on:click=move |_| {
+                if let Ok(judge) = new_judge.get().parse() {
+                    let mut judges = judges.get();
+                    judges.push(judge);
+                    set_judges.set(judges);
+                    set_new_judge.set(generate_keypair(&mut rand::thread_rng()).1.to_string());
+                } else {
+                    return
+                }
+            }>"Add"</a></p>
+            <ul>
+            <For each=move || judges.get() key=move |judge| judge.clone()
+                view=move |judge: UserPubKey| view!{
+                    <li>{judge.to_string()}" "
+                        <a href="#" role="button" class="contrast"
+                            on:click=move |_| {
+                                let mut judges = judges.get();
+                                judges.retain(|judge_item| {
+                                    judge_item != &judge
+                                });
+                                set_judges.set(judges);
+                            }
+                        >"Remove"</a>
+                    </li>
+                } />
+            </ul>
         </div>
     }
 }
