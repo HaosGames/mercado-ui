@@ -122,6 +122,13 @@ pub fn PredictionListItem(prediction: PredictionOverviewResponse) -> impl IntoVi
             <td><a href={format!("/prediction/{}", prediction.id)}>{prediction.name}</a></td>
             <td>{prediction.trading_end.to_string()}</td>
             <td>{prediction.judge_share_ppm / 10000}"%"</td>
+            <td>{prediction.state.to_string()}{
+                match prediction.state {
+                    MarketState::Resolved(decision) => format!(" ({})", decision),
+                    MarketState::Refunded(reason) => format!(" ({:?})", reason),
+                    _ => String::new()
+                }
+            }</td>
         </tr>
     }
 }
@@ -137,6 +144,7 @@ pub fn PredictionList() -> impl IntoView {
                    <th>"Prediction"</th>
                    <th>"End"</th>
                    <th>"Judge Share"</th>
+                   <th>"State"</th>
                 </tr>
                 {
                     predictions.sort_by(|a, b| a.id.cmp(&b.id));
@@ -201,16 +209,38 @@ where
         "".into_view()
     }
 }
-
+#[component]
+pub fn UnwrapResourceFor<F, V, T, R>(
+    view: F,
+    resource: R,
+    state: ReadSignal<MercadoState>,
+) -> impl IntoView
+where
+    F: Fn(T) -> V + 'static,
+    R: Fn() -> Option<Result<T, String>> + 'static,
+    V: IntoView,
+{
+    if let Some(access) = state.get_untracked().access {
+        view! {
+            <UnwrapResourceForUser view=view resource=resource state=state user=access.user />
+        }
+        .into_view()
+    } else {
+        "".into_view()
+    }
+}
 #[component]
 pub fn PredictionOverview(state: ReadSignal<MercadoState>) -> impl IntoView {
     let params = use_params_map();
     let id = move || params.with(|p| p.get("id").cloned());
     let id = move || id().unwrap_or_default().parse::<RowId>().unwrap();
-    let (refresh_ratio, set_refresh_ratio) = create_signal(0);
-    let prediction = create_local_resource(move || id(), move |id| get_prediction_overview(id));
+    let refresh = create_rw_signal(true);
+    let prediction = create_local_resource(
+        move || (id(), refresh.get()),
+        move |(id, _)| get_prediction_overview(id),
+    );
     let ratio = create_local_resource(
-        move || refresh_ratio.get(),
+        move || refresh.get(),
         move |_| {
             get_prediction_ratio(PredictionRequest {
                 prediction: id(),
@@ -218,10 +248,34 @@ pub fn PredictionOverview(state: ReadSignal<MercadoState>) -> impl IntoView {
             })
         },
     );
+    let force_decision_period =
+        create_action(move |&()| force_decision_period(id(), state.get().access.unwrap()));
     view! {
         <UnwrapResource resource=move || prediction.get() view=move |prediction| view! {
-            <h3>{prediction.name}</h3>
-            <p>"State: "{prediction.state.to_string()}<br/>
+            <h3>{prediction.name.clone()}</h3>
+            <p>"State: "{prediction.state.to_string()}{
+                match prediction.state {
+                    MarketState::Resolved(decision) => format!(" ({})", decision),
+                    MarketState::Refunded(reason) => format!(" ({:?})", reason),
+                    _ => String::new()
+                }
+            }
+            {
+                if let Some(user) = state.get().user {
+                    if prediction.state == MarketState::Trading
+                        && (user.role == UserRole::Root || user.role == UserRole::Admin)
+                    { view!{
+                            <span style="float:right"><a href="#" role="button"
+                                on:click=move |_| {
+                                    force_decision_period.dispatch(());
+                                    refresh.set(!refresh.get());
+                                }
+                            >"Force decision period"</a></span>
+                        }.into_view()
+                    } else {view!{}.into_view()}
+                } else {view!{}.into_view()}
+            }
+            <br/>
             "End: "{prediction.trading_end.to_string()}<br/>
             "Judge share: "{prediction.judge_share_ppm as f32/10000.0}"%"<br/>
             "Decision period: "{prediction.decision_period_sec/86400}" days"<br/>
@@ -238,9 +292,11 @@ pub fn PredictionOverview(state: ReadSignal<MercadoState>) -> impl IntoView {
                     )}</span><br/>
                     <progress value={ratio.0} max={ratio.0+ratio.1} />
                 } /><br/>
-                <a href="" role="button" on:click=move |_| {set_refresh_ratio.set(refresh_ratio.get()+1)}>"Refresh"</a>
+                <a href="" role="button" on:click=move |_| {
+                    refresh.set(!refresh.get());
+                }>"Refresh"</a>
             </p>
-            <JudgeList prediction=prediction.id judge_count=prediction.judge_count state=state/>
+            <JudgeList prediction=prediction.clone() judge_count=prediction.judge_count state=state refresh=refresh />
             <BetList prediction=prediction.id user=None />
             <p>"Id: "{prediction.id}</p>
         } />
@@ -248,13 +304,15 @@ pub fn PredictionOverview(state: ReadSignal<MercadoState>) -> impl IntoView {
 }
 #[component]
 pub fn JudgeList(
-    prediction: RowId,
+    prediction: PredictionOverviewResponse,
     judge_count: u32,
     state: ReadSignal<MercadoState>,
+    refresh: RwSignal<bool>,
 ) -> impl IntoView {
+    let market_state = prediction.state.clone();
     let judges = create_local_resource(
-        move || prediction,
-        move |prediction| get_judges(Some(prediction), None),
+        move || prediction.clone(),
+        move |prediction| get_judges(Some(prediction.id), None),
     );
     view! {
         <UnwrapResource
@@ -270,7 +328,7 @@ pub fn JudgeList(
                     </tr>
                     <For each=move || judges.clone() key=move |judge| judge.user
                     view=move |judge: JudgePublic| view!{
-                        <JudgeListItem judge=judge state=state />
+                        <JudgeListItem judge=judge prediction_state=market_state state=state refresh=refresh />
                     }/>
                 </table>
             </details>
@@ -278,12 +336,27 @@ pub fn JudgeList(
     }
 }
 #[component]
-pub fn JudgeListItem(judge: JudgePublic, state: ReadSignal<MercadoState>) -> impl IntoView {
+pub fn JudgeListItem(
+    judge: JudgePublic,
+    prediction_state: MarketState,
+    state: ReadSignal<MercadoState>,
+    refresh: RwSignal<bool>,
+) -> impl IntoView {
     let accept = create_action(|request: &PostRequest<NominationRequest>| {
         accept_nomination(request.data.clone(), request.access.clone())
     });
     let refuse = create_action(|request: &PostRequest<NominationRequest>| {
         refuse_nomination(request.data.clone(), request.access.clone())
+    });
+    let decide = create_action(move |(judge, bet): &(Judge, bool)| {
+        make_decision(
+            MakeDecisionRequest {
+                decision: bet.clone(),
+                judge: judge.user,
+                prediction: judge.prediction.clone(),
+            },
+            state.get().access.unwrap(),
+        )
     });
     let (count, set_count) = create_signal(0);
     let judge_priv = create_local_resource(
@@ -300,27 +373,55 @@ pub fn JudgeListItem(judge: JudgePublic, state: ReadSignal<MercadoState>) -> imp
                 view=move |judge| judge.state.to_string()
             /></td>
             <td><UnwrapResourceForUser
-                user=judge.user
-                state=state
-                resource=move || judge_priv.get()
-                view= move |judge| view! {
-                <a href="#" role="button" class="outline" on:click=move |_| {
-                    accept.dispatch(PostRequest {
-                        data: NominationRequest {user: judge.user, prediction: judge.prediction},
-                        access: state.get().access.unwrap()});
-                    set_count.set(count.get() + 1);
-                }>
-                    "Accept"
-                </a>
-                <a href="#" role="button" class="outline contrast" on:click=move |_| {
-                    refuse.dispatch(PostRequest {
-                        data: NominationRequest {user: judge.user, prediction: judge.prediction},
-                        access: state.get().access.unwrap()});
-                    set_count.set(count.get() + 1);
-                }>
-                    "Refuse"
-                </a>
-            } />
+            user=judge.user
+            state=state
+            resource=move || judge_priv.get()
+            view= move |judge| {
+                match prediction_state {
+                    MarketState::WaitingForJudges => {
+                        view! {
+                            <a href="#" role="button" class="outline" on:click=move |_| {
+                                accept.dispatch(PostRequest {
+                                    data: NominationRequest {user: judge.user, prediction: judge.prediction},
+                                    access: state.get().access.unwrap()});
+                                set_count.set(count.get() + 1);
+                                refresh.set(!refresh.get());
+                            }>
+                                "Accept"
+                            </a>
+                            <a href="#" role="button" class="outline contrast" on:click=move |_| {
+                                refuse.dispatch(PostRequest {
+                                    data: NominationRequest {user: judge.user, prediction: judge.prediction},
+                                    access: state.get().access.unwrap()});
+                                set_count.set(count.get() + 1);
+                                refresh.set(!refresh.get());
+                            }>
+                                "Refuse"
+                            </a>
+                        }.into_view()
+                    }
+                    MarketState::WaitingForDecision => {
+                        view! {
+                            <a href="#" role="button" class="outline" on:click=move |_| {
+                                decide.dispatch((judge, true));
+                                set_count.set(count.get() + 1);
+                                refresh.set(!refresh.get());
+                            }>
+                                "Decide True"
+                            </a>
+                            <a href="#" role="button" class="outline contrast" on:click=move |_| {
+                                decide.dispatch((judge, false));
+                                set_count.set(count.get() + 1);
+                                refresh.set(!refresh.get());
+                            }>
+                                "Decide False"
+                            </a>
+
+                        }.into_view()
+                    }
+                    _ => {view!{}.into_view()}
+                }
+                } />
             </td>
         </tr>
     }

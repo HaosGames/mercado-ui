@@ -155,3 +155,18 @@ pub async fn new_prediction(request: NewPredictionRequest) -> Result<RowId, Stri
 pub async fn add_bet(request: AddBetRequest, access: AccessRequest) -> Result<Invoice, String> {
     client().add_bet(request, access).await.map_err(map_any_err)
 }
+pub async fn make_decision(
+    request: MakeDecisionRequest,
+    access: AccessRequest,
+) -> Result<(), String> {
+    client()
+        .make_decision(request, access)
+        .await
+        .map_err(map_any_err)
+}
+pub async fn force_decision_period(prediction: RowId, access: AccessRequest) -> Result<(), String> {
+    client()
+        .force_decision_period(prediction, access)
+        .await
+        .map_err(map_any_err)
+}
