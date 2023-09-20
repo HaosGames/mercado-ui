@@ -661,6 +661,7 @@ pub fn AddBet(state: ReadSignal<MercadoState>) -> impl IntoView {
                         match predictions.get() {
                             Some(Ok(mut predictions)) => {
                                 predictions.retain(|prediction| {
+                                    if prediction.state != MarketState::Trading {return false}
                                     if let Ok(id) = search.get().parse::<i64>() {
                                         prediction.id == id
                                     } else {
