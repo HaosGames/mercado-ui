@@ -143,3 +143,6 @@ pub async fn my_bets(access: Option<AccessRequest>) -> Result<Vec<Bet>, String> 
         Err("You need to login to see your bets".to_string())
     }
 }
+pub async fn new_prediction(request: NewPredictionRequest) -> Result<RowId, String> {
+    client().new_prediction(request).await.map_err(map_any_err)
+}

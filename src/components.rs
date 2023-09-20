@@ -1,5 +1,6 @@
 #![allow(non_snake_case)]
 use crate::{fetchers::*, MercadoState};
+use anyhow::bail;
 use chrono::DateTime;
 use chrono::{offset::Utc, Duration};
 use leptos::{html::Input, *};
@@ -384,18 +385,22 @@ pub fn MyBets(access: ReadSignal<MercadoState>) -> impl IntoView {
 pub fn NewPrediction(state: ReadSignal<MercadoState>) -> impl IntoView {
     let (prediction, set_prediction) = create_signal(String::from("This works"));
     let (end, set_end) = create_signal(String::from(
-        (Utc::now() + Duration::days(1)).to_rfc3339().split_at(16).0,
+        (Utc::now() + Duration::days(5)).to_rfc3339().split_at(16).0,
     ));
     let (judge_count, set_judge_count) = create_signal("3".to_string());
     let (judges, set_judges) = create_signal::<Vec<UserPubKey>>(vec![]);
     let (new_judge, set_new_judge) =
         create_signal(generate_keypair(&mut rand::thread_rng()).1.to_string());
+    let (decision, set_decision) = create_signal("3".to_string());
+    let (judge_share, set_judge_share) = create_signal("10000".to_string());
 
     let parsed_end = move || (end.get() + ":00Z").parse::<DateTime<Utc>>();
     let display_end = move || match parsed_end() {
         Ok(parsed) => parsed.to_string().into_view(),
         Err(_e) => "".into_view(),
     };
+
+    let (create_message, set_create_message) = create_signal(view! {}.into_view());
 
     view! {
         <div>
@@ -407,10 +412,18 @@ pub fn NewPrediction(state: ReadSignal<MercadoState>) -> impl IntoView {
                 }
                 value={prediction}
             />
-            <label>"Ends at "{display_end}</label>
-            <input type="datetime-local" on:input=move |e| { set_end.set(event_target_value(&e)); } value={end}/>
-            <label>"How many judges need to participate?"</label>
-            <input type="number" on:input=move |e| { set_judge_count.set(event_target_value(&e)) } value={judge_count}/>
+            <div class="grid">
+                <label>"Ends at "{display_end}
+                <input type="datetime-local" on:input=move |e| { set_end.set(event_target_value(&e)); } value={end}/></label>
+                <label>"Days of decision period for judges"
+                <input type="number" on:input=move |e| { set_decision.set(event_target_value(&e))} value={decision} /></label>
+            </div>
+            <div class="grid">
+                <label>"Portion for Judges (ppm)"
+                <input type="number" on:input=move |e| { set_judge_share.set(event_target_value(&e))} value={judge_share} /></label>
+                <label>"How many judges need to participate?"
+                <input type="number" on:input=move |e| { set_judge_count.set(event_target_value(&e)) } value={judge_count}/></label>
+            </div>
             <p>"Judges: "
                 <input type="text" on:input=move |e| {set_new_judge.set(event_target_value(&e)) } value={new_judge}/>
             <a href="#" role="button" on:click=move |_| {
@@ -439,6 +452,45 @@ pub fn NewPrediction(state: ReadSignal<MercadoState>) -> impl IntoView {
                     </li>
                 } />
             </ul>
+            {move || create_message.get()}
+            <button on:click=move |_| {
+                let result = move || {
+                    let request = NewPredictionRequest {
+                        decision_period_sec: decision.get().parse::<u32>()? * 86400,
+                        judge_count: judge_count.get().parse()?,
+                        judge_share_ppm: judge_share.get().parse()?,
+                        judges: judges.get(),
+                        prediction: prediction.get(),
+                        trading_end: parsed_end()?
+                    };
+                    let new_prediction_id = create_action(|request: &NewPredictionRequest| new_prediction(request.clone()));
+                    new_prediction_id.dispatch(request);
+                    match new_prediction_id.value().get() {
+                        Some(Ok(rowid)) => {
+                            Ok(rowid)
+                        }
+                        Some(Err(e)) => {
+                            bail!("{:?}", e)
+                        }
+                        None => {
+                            bail!("Got NONE from action")
+                        }
+                    }
+                };
+                match result() {
+                    Ok(rowid) => {
+                        //FIXME this branch doesn't get called because we only get NONE from the
+                        //action
+                        let navigate = leptos_router::use_navigate();
+                        navigate(format!("/prediction/{}", rowid).as_str(), Default::default());
+                    }
+                    Err(e) => {
+                        set_create_message.set(view!{
+                            <label>{format!("{:?}", e)}</label>
+                        }.into_view());
+                    }
+                }
+            } >"Create"</button>
         </div>
     }
 }

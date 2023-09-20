@@ -1,3 +1,4 @@
+#![allow(unused)]
 use crate::components::*;
 use leptos::*;
 use leptos_router::*;
