@@ -146,3 +146,6 @@ pub async fn my_bets(access: Option<AccessRequest>) -> Result<Vec<Bet>, String> 
 pub async fn new_prediction(request: NewPredictionRequest) -> Result<RowId, String> {
     client().new_prediction(request).await.map_err(map_any_err)
 }
+pub async fn add_bet(request: AddBetRequest, access: AccessRequest) -> Result<Invoice, String> {
+    client().add_bet(request, access).await.map_err(map_any_err)
+}

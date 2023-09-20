@@ -498,19 +498,44 @@ pub fn NewPrediction(state: ReadSignal<MercadoState>) -> impl IntoView {
 pub fn AddBet(state: ReadSignal<MercadoState>) -> impl IntoView {
     let predictions = create_local_resource(move || {}, get_predictions);
     let (search, set_search) = create_signal(String::new());
+    let (prediction, set_prediction) = create_signal(String::new());
     let (bet, set_bet) = create_signal(String::new());
     let (amount, set_amount) = create_signal(String::new());
-    let is_admin = if let Some(user) = state.get().user {
+    let is_admin = if let Some(user) = state.get_untracked().user {
         user.role == UserRole::Admin || user.role == UserRole::Root
     } else {
         false
     };
+    let add_bet = move || {
+        let access = if let Some(access) = state.get().access {
+            access
+        } else {
+            bail!("Not logged in")
+        };
+        let request = AddBetRequest {
+            bet: bet.get().parse()?,
+            prediction: prediction.get().parse()?,
+            user: access.user,
+        };
+        let action = create_action(|(request, access): &(AddBetRequest, AccessRequest)| {
+            add_bet(request.clone(), access.clone())
+        });
+        action.dispatch((request, access));
+        match action.value().get() {
+            Some(Ok(invoice)) => Ok(invoice),
+            None | Some(Err(_)) => {
+                bail!("Got NONE or ERR from action")
+            }
+        }
+    };
     view! {
         <div>
             <h3>"New bet"</h3>
-            <label>"Search predictions"<input type="search" on:input=move |e| {set_search.set(event_target_value(&e))}/></label>
+            <label>"Search predictions"
+                <input type="search" placeholder="Name or ID" autofocus on:input=move |e| {set_search.set(event_target_value(&e))}/>
+            </label>
             <label>"Prediction"
-                <select>
+                <select on:input=move |e| {set_prediction.set(event_target_value(&e))}>
                     <option disabled value="" selected>"Select a prediction"</option>
                     <For each=move || {
                         match predictions.get() {
@@ -522,6 +547,7 @@ pub fn AddBet(state: ReadSignal<MercadoState>) -> impl IntoView {
                                         prediction.name.contains(search.get().as_str())
                                     }
                                 });
+                                predictions.sort_by(|a,b| a.name.cmp(&b.name));
                                 predictions
                             },
                             None | Some(Err(_))=> vec![],
@@ -530,7 +556,7 @@ pub fn AddBet(state: ReadSignal<MercadoState>) -> impl IntoView {
                     key=move |prediction| prediction.id
                     view=move |prediction| {
                         view! {
-                            <option>{prediction.name}" ("{prediction.id}")"</option>
+                            <option value={prediction.id}>{prediction.name}" ("{prediction.id}")"</option>
                         }
                     }
                     />
@@ -560,7 +586,9 @@ pub fn AddBet(state: ReadSignal<MercadoState>) -> impl IntoView {
                 }
             </div>
             <div>
-            <a href="" role="button" on:click=move |_| {} >"Add"</a>" "
+            <a href="" role="button" on:click=move |_| {
+                add_bet();
+            } >"Add"</a>" "
             {
                 if is_admin {
                     view!{
