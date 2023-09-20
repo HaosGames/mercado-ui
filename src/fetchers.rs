@@ -53,6 +53,12 @@ pub async fn get_prediction_bets(request: PredictionRequest) -> Result<Vec<Bet>,
         .await
         .map_err(map_any_err)
 }
+pub async fn get_prediction_ratio(request: PredictionRequest) -> Result<(Sats, Sats), String> {
+    client()
+        .get_prediction_ratio(request)
+        .await
+        .map_err(map_any_err)
+}
 
 pub async fn accept_nomination(
     request: NominationRequest,

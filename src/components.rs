@@ -158,9 +158,9 @@ where
     view! {
         {
             move || match resource() {
-                None => view! {<p>"Loading..."</p>}.into_view(),
+                None => view! {<small>"Loading..."</small>}.into_view(),
                 Some(Ok(t)) => view(t).into_view(),
-                Some(Err(e)) => view! {<p>{format!("{:?}", e)}</p>}.into_view(),
+                Some(Err(e)) => view! {<small>{format!("{:?}", e)}</small>}.into_view(),
             }
         }
     }
@@ -207,14 +207,38 @@ pub fn PredictionOverview(state: ReadSignal<MercadoState>) -> impl IntoView {
     let params = use_params_map();
     let id = move || params.with(|p| p.get("id").cloned());
     let id = move || id().unwrap_or_default().parse::<RowId>().unwrap();
+    let (refresh_ratio, set_refresh_ratio) = create_signal(0);
     let prediction = create_local_resource(move || id(), move |id| get_prediction_overview(id));
+    let ratio = create_local_resource(
+        move || refresh_ratio.get(),
+        move |_| {
+            get_prediction_ratio(PredictionRequest {
+                prediction: id(),
+                user: None,
+            })
+        },
+    );
     view! {
         <UnwrapResource resource=move || prediction.get() view=move |prediction| view! {
             <h3>{prediction.name}</h3>
             <p>"State: "{prediction.state.to_string()}<br/>
             "End: "{prediction.trading_end.to_string()}<br/>
-            "Judge share: "{prediction.judge_share_ppm/10000}"%"<br/>
+            "Judge share: "{prediction.judge_share_ppm as f32/10000.0}"%"<br/>
             "Decision period: "{prediction.decision_period_sec/86400}" days"<br/>
+            </p>
+            <p>
+                <UnwrapResource resource=move || ratio.get() view=move |ratio| view! {
+                    <span>{format!("True: {}% ({} sats)",
+                         ratio.0 as f32/(ratio.0+ratio.1)as f32*100.0,
+                         ratio.0,
+                    )}</span>
+                    <span style="float:right">{format!("False: {}% ({} sats)",
+                         ratio.1 as f32/(ratio.0+ratio.1)as f32*100.0,
+                         ratio.1,
+                    )}</span><br/>
+                    <progress value={ratio.0} max={ratio.0+ratio.1} />
+                } /><br/>
+                <a href="" role="button" on:click=move |_| {set_refresh_ratio.set(refresh_ratio.get()+1)}>"Refresh"</a>
             </p>
             <JudgeList prediction=prediction.id judge_count=prediction.judge_count state=state/>
             <BetList prediction=prediction.id user=None />
@@ -366,16 +390,16 @@ pub fn MyBets(access: ReadSignal<MercadoState>) -> impl IntoView {
                 <th>"Amount"</th>
                 <th>"Prediction"</th>
                 <th>"State"</th>
-                <th>"Actions"</th>
+                <th>"Invoice"</th>
             </tr>
             <For each=move || bets.get().transpose().ok().flatten().unwrap_or_default() key=move |bet| bet.user
             view=move |bet: Bet| view!{
                 <tr>
                     <td>{bet.bet}</td>
                     <td>{bet.amount.unwrap_or(0)}</td>
-                    <td>"Prediction"</td>
+                    <td><a href={format!("/prediction/{}", bet.prediction)}>"Prediction"</a></td>
                     <td>{bet.state.to_string()}</td>
-                    <td>""</td>
+                    <td><small>{bet.fund_invoice}</small></td>
                 </tr>
             }/>
         </table>
@@ -501,11 +525,7 @@ pub fn AddBet(state: ReadSignal<MercadoState>) -> impl IntoView {
     let (prediction, set_prediction) = create_signal(String::new());
     let (bet, set_bet) = create_signal(String::new());
     let (amount, set_amount) = create_signal(String::new());
-    let is_admin = if let Some(user) = state.get_untracked().user {
-        user.role == UserRole::Admin || user.role == UserRole::Root
-    } else {
-        false
-    };
+
     let add_bet = move || {
         let access = if let Some(access) = state.get().access {
             access
@@ -575,27 +595,11 @@ pub fn AddBet(state: ReadSignal<MercadoState>) -> impl IntoView {
                     "False"
                     </label>
                 </fieldset>
-                {
-                    if is_admin {
-                        view!{
-                            <label>"Amount (sats)"
-                            <input type="number" on:input=move |e| {set_amount.set(event_target_value(&e))} />
-                            </label>
-                        }.into_view()
-                    } else {view!{}.into_view()}
-                }
             </div>
             <div>
-            <a href="" role="button" on:click=move |_| {
-                add_bet();
-            } >"Add"</a>" "
-            {
-                if is_admin {
-                    view!{
-                        <a href="" role="button" on:click=move |_| {} >"Add & Pay"</a>
-                    }.into_view()
-                } else {view!{}.into_view()}
-            }
+                <a href="" role="button" on:click=move |_| {
+                    add_bet();
+                } >"Add"</a>
             </div>
         </div>
     }
