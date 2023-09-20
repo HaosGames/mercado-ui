@@ -556,7 +556,6 @@ pub fn AddBet(state: ReadSignal<MercadoState>) -> impl IntoView {
             </label>
             <label>"Prediction"
                 <select on:input=move |e| {set_prediction.set(event_target_value(&e))}>
-                    <option disabled value="" selected>"Select a prediction"</option>
                     <For each=move || {
                         match predictions.get() {
                             Some(Ok(mut predictions)) => {
