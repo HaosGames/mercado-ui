@@ -28,8 +28,8 @@ pub fn Navi(
                 <details role="list" >
                     <summary aria-haspopup="listbox" role="link" >"New"</summary>
                     <ul role="listbox">
-                        <li><a href="/new_prediction">"Prediction"</a></li>
-                        <li><a>"Bet"</a></li>
+                        <li><A href="/new_prediction">"Prediction"</A></li>
+                        <li><A href="/add_bet">"Bet"</A></li>
                     </ul>
                 </details>
             </ul>
@@ -491,6 +491,84 @@ pub fn NewPrediction(state: ReadSignal<MercadoState>) -> impl IntoView {
                     }
                 }
             } >"Create"</button>
+        </div>
+    }
+}
+#[component]
+pub fn AddBet(state: ReadSignal<MercadoState>) -> impl IntoView {
+    let predictions = create_local_resource(move || {}, get_predictions);
+    let (search, set_search) = create_signal(String::new());
+    let (bet, set_bet) = create_signal(String::new());
+    let (amount, set_amount) = create_signal(String::new());
+    let is_admin = if let Some(user) = state.get().user {
+        user.role == UserRole::Admin || user.role == UserRole::Root
+    } else {
+        false
+    };
+    view! {
+        <div>
+            <h3>"New bet"</h3>
+            <label>"Search predictions"<input type="search" on:input=move |e| {set_search.set(event_target_value(&e))}/></label>
+            <label>"Prediction"
+                <select>
+                    <option disabled value="" selected>"Select a prediction"</option>
+                    <For each=move || {
+                        match predictions.get() {
+                            Some(Ok(mut predictions)) => {
+                                predictions.retain(|prediction| {
+                                    if let Ok(id) = search.get().parse::<i64>() {
+                                        prediction.id == id
+                                    } else {
+                                        prediction.name.contains(search.get().as_str())
+                                    }
+                                });
+                                predictions
+                            },
+                            None | Some(Err(_))=> vec![],
+                        }
+                    }
+                    key=move |prediction| prediction.id
+                    view=move |prediction| {
+                        view! {
+                            <option>{prediction.name}" ("{prediction.id}")"</option>
+                        }
+                    }
+                    />
+
+                </select>
+            </label>
+            <div class="grid">
+                <fieldset>
+                    <legend>"Bet"</legend>
+                    <label>
+                    <input type="radio" value="true" name="bet" on:input=move |e| {set_bet.set(event_target_value(&e))} />
+                    "True"
+                    </label>
+                    <label>
+                    <input type="radio" value="false" name="bet" on:input=move |e| {set_bet.set(event_target_value(&e))} />
+                    "False"
+                    </label>
+                </fieldset>
+                {
+                    if is_admin {
+                        view!{
+                            <label>"Amount (sats)"
+                            <input type="number" on:input=move |e| {set_amount.set(event_target_value(&e))} />
+                            </label>
+                        }.into_view()
+                    } else {view!{}.into_view()}
+                }
+            </div>
+            <div>
+            <a href="" role="button" on:click=move |_| {} >"Add"</a>" "
+            {
+                if is_admin {
+                    view!{
+                        <a href="" role="button" on:click=move |_| {} >"Add & Pay"</a>
+                    }.into_view()
+                } else {view!{}.into_view()}
+            }
+            </div>
         </div>
     }
 }
