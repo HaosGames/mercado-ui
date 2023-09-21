@@ -46,7 +46,7 @@ pub fn Navi(
                                 } else {
                                     None
                                 }
-                            } /></summary>
+                            } no_clipboard=true /></summary>
                             <ul role="listbox">
                                 <li><a>"Edit user"</a></li>
                                 <li><a>"Predictions"</a></li>
@@ -480,14 +480,49 @@ pub fn BetList(prediction: RowId, user: Option<UserPubKey>) -> impl IntoView {
     }
 }
 #[component]
-pub fn ShortenedString(mut string: String) -> impl IntoView {
+pub fn ShortenedString(
+    mut string: String,
+    #[prop(optional)] no_clipboard: Option<bool>,
+) -> impl IntoView {
+    let open = create_rw_signal(false);
+    let original = string.clone();
     let end = string.split_off(59);
     string.truncate(8);
     string = string + "..." + end.as_str();
-    view! {<small>{string}</small>}.into_view()
+    view! {
+        <span>
+            <small>{string}</small>
+            {
+            if let None |Some(false) = no_clipboard {
+                view!{
+                    <a href="" on:click=move |_| {
+                        // TODO Enable copying to clipboard
+                        // if let Some(clipboard) = window().navigator().clipboard() {
+                        //     clipboard.write_text(original.as_str());
+                        // }
+                        open.set(true);
+                    }>"📋 "</a>
+                    <dialog open=open>
+                        <article>
+                            <header>
+                                <a href="" class="close" aria-label="Close" on:click=move |_| open.set(false)></a>
+                                "Copy"
+                            </header>
+                            <p>{original}</p>
+                        </article>
+                    </dialog>
+                }.into_view()
+            } else {view!{}.into_view()}
+            }
+        </span>
+    }
+    .into_view()
 }
 #[component]
-pub fn Username(user: Option<UserPubKey>) -> impl IntoView {
+pub fn Username(
+    user: Option<UserPubKey>,
+    #[prop(optional)] no_clipboard: Option<bool>,
+) -> impl IntoView {
     let usernames = create_local_resource(move || user.unwrap(), get_username);
     view! {{
         move || {
@@ -495,7 +530,11 @@ pub fn Username(user: Option<UserPubKey>) -> impl IntoView {
                 let name = usernames.get().transpose().ok().flatten().unwrap_or_default();
                 if name.is_empty() {
                     let mut user = user.to_string();
-                    view!{<ShortenedString string=user />}.into_view()
+                    if let None | Some(false) = no_clipboard {
+                        view!{<ShortenedString string=user />}.into_view()
+                    } else {
+                        view!{<ShortenedString string=user no_clipboard=true />}.into_view()
+                    }
                 } else {
                     view! {<span title={user.to_string()} >{name}</span>}.into_view()
                 }
