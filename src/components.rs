@@ -51,7 +51,7 @@ pub fn Navi(
                                 <li><a>"Edit user"</a></li>
                                 <li><a>"Predictions"</a></li>
                                 <li><a href="/my_bets">"Bets"</a></li>
-                                <li><a>"Judges"</a></li>
+                                <li><a href="/my_judges">"Judges"</a></li>
                                 <li><a href="/cash_outs">"Cash Outs"</a></li>
                                 <li><a href="/" on:click=move |_| {set_state.set(MercadoState::default())} >"Logout"</a></li>
                             </ul>
@@ -292,7 +292,6 @@ pub fn PredictionOverview(state: ReadSignal<MercadoState>) -> impl IntoView {
     view! {
         <UnwrapResource resource=prediction view=move |prediction| view! {
             <h3>{prediction.name.clone()}</h3>
-            <p>"State: "{prediction.state.to_string()}
             {
                 if let Some(user) = state.get().user {
                     if prediction.state == MarketState::Trading
@@ -308,11 +307,31 @@ pub fn PredictionOverview(state: ReadSignal<MercadoState>) -> impl IntoView {
                     } else {view!{}.into_view()}
                 } else {view!{}.into_view()}
             }
-            <br/>
-            "End: "{prediction.trading_end.to_string()}<br/>
-            "Judge share: "{prediction.judge_share_ppm as f32/10000.0}"%"<br/>
-            "Decision period: "{prediction.decision_period_sec/86400}" days"<br/>
-            </p>
+            <table>
+                <tr>
+                    <th>"State"</th>
+                    <th>"End"</th>
+                    <th>"Time left"</th>
+                    <th>"Judge share"</th>
+                    <th>"Judge count"</th>
+                    <th>"Decision period"</th>
+                </tr>
+                <tr>
+                    <td>{prediction.state.to_string()}</td>
+                    <td>{prediction.trading_end.to_string()}</td>
+                    <td>{
+                        let left = (prediction.trading_end - Utc::now());
+                        format!("{} weeks {} days {} hours",
+                            left.num_weeks(),
+                            left.num_days() % 7,
+                            left.num_hours() % 24
+                        )
+                    }</td>
+                    <td>{prediction.judge_share_ppm as f32/10000.0}"%"</td>
+                    <td>{prediction.judge_count}</td>
+                    <td>{prediction.decision_period_sec/86400}" days"</td>
+                </tr>
+            </table>
             <p>
                 <UnwrapResource resource=ratio view=move |ratio| view! {
                     <span>{format!("True: {}% ({} sats)",
@@ -329,7 +348,7 @@ pub fn PredictionOverview(state: ReadSignal<MercadoState>) -> impl IntoView {
                     refresh.set(!refresh.get());
                 }>"Refresh"</a>
             </p>
-            <JudgeList prediction=prediction.clone() judge_count=prediction.judge_count state=state refresh=refresh />
+            <JudgeList prediction=Some(prediction.id) user=user state=state refresh=refresh />
             <BetList prediction=Some(prediction.id) state=state collapsable=true
                 user=user
             />
@@ -339,22 +358,26 @@ pub fn PredictionOverview(state: ReadSignal<MercadoState>) -> impl IntoView {
 }
 #[component]
 pub fn JudgeList(
-    prediction: PredictionOverviewResponse,
-    judge_count: u32,
+    prediction: Option<RowId>,
+    user: Option<UserPubKey>,
     state: ReadSignal<MercadoState>,
-    refresh: RwSignal<bool>,
+    #[prop(optional)] refresh: Option<RwSignal<bool>>,
 ) -> impl IntoView {
-    let market_state = prediction.state.clone();
+    let refresh = if let Some(refresh) = refresh {
+        refresh
+    } else {
+        create_rw_signal(true)
+    };
     let judges = create_local_resource(
         move || prediction.clone(),
-        move |prediction| get_judges(Some(prediction.id), None),
+        move |prediction| get_judges(prediction, user),
     );
     view! {
         <UnwrapResource
             resource=judges
             view=move |judges| view! {
             <details open>
-                <summary>{format!("Judges: {}/{}", judge_count, judges.len())}</summary>
+                <summary>{format!("Judges: {}", judges.len())}</summary>
                 <table>
                     <tr>
                         <th>"Judge"</th>
@@ -363,7 +386,7 @@ pub fn JudgeList(
                     </tr>
                     <For each=move || judges.clone() key=move |judge| judge.user
                     view=move |judge: JudgePublic| view!{
-                        <JudgeListItem judge=judge prediction_state=market_state state=state refresh=refresh />
+                        <JudgeListItem judge=judge state=state refresh=refresh />
                     }/>
                 </table>
             </details>
@@ -373,10 +396,18 @@ pub fn JudgeList(
 #[component]
 pub fn JudgeListItem(
     judge: JudgePublic,
-    prediction_state: MarketState,
     state: ReadSignal<MercadoState>,
-    refresh: RwSignal<bool>,
+    #[prop(optional)] refresh: Option<RwSignal<bool>>,
 ) -> impl IntoView {
+    let refresh = if let Some(refresh) = refresh {
+        refresh
+    } else {
+        create_rw_signal(true)
+    };
+    let prediction = create_local_resource(
+        move || (judge.prediction, refresh.get()),
+        move |(id, _)| get_prediction_overview(id),
+    );
     let accept = create_action(|request: &PostRequest<NominationRequest>| {
         accept_nomination(request.data.clone(), request.access.clone())
     });
@@ -412,7 +443,7 @@ pub fn JudgeListItem(
             state=state
             resource=judge_priv
             view= move |judge| {
-                match prediction_state {
+                match prediction.get().transpose().ok().flatten().map(|prediction| prediction.state).unwrap_or(MarketState::Trading) {
                     MarketState::WaitingForJudges => {
                         view! {
                             <a href="#" role="button" class="outline" on:click=move |_| {
@@ -615,6 +646,22 @@ pub fn MyBets(state: ReadSignal<MercadoState>) -> impl IntoView {
 
     view! {
         <BetList state=state prediction=None user=user />
+    }
+}
+#[component]
+pub fn MyJudges(state: ReadSignal<MercadoState>) -> impl IntoView {
+    let user = if let Some(user) = state.get().user {
+        if let UserRole::User = user.role {
+            Some(user.user)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    view! {
+        <JudgeList state=state prediction=None user=user />
     }
 }
 #[component]
