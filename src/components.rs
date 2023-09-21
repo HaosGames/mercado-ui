@@ -122,13 +122,7 @@ pub fn PredictionListItem(prediction: PredictionOverviewResponse) -> impl IntoVi
             <td><a href={format!("/prediction/{}", prediction.id)}>{prediction.name}</a></td>
             <td>{prediction.trading_end.to_string()}</td>
             <td>{prediction.judge_share_ppm / 10000}"%"</td>
-            <td>{prediction.state.to_string()}{
-                match prediction.state {
-                    MarketState::Resolved(decision) => format!(" ({})", decision),
-                    MarketState::Refunded(reason) => format!(" ({:?})", reason),
-                    _ => String::new()
-                }
-            }</td>
+            <td>{prediction.state.to_string()}</td>
         </tr>
     }
 }
@@ -253,13 +247,7 @@ pub fn PredictionOverview(state: ReadSignal<MercadoState>) -> impl IntoView {
     view! {
         <UnwrapResource resource=move || prediction.get() view=move |prediction| view! {
             <h3>{prediction.name.clone()}</h3>
-            <p>"State: "{prediction.state.to_string()}{
-                match prediction.state {
-                    MarketState::Resolved(decision) => format!(" ({})", decision),
-                    MarketState::Refunded(reason) => format!(" ({:?})", reason),
-                    _ => String::new()
-                }
-            }
+            <p>"State: "{prediction.state.to_string()}
             {
                 if let Some(user) = state.get().user {
                     if prediction.state == MarketState::Trading
@@ -290,7 +278,7 @@ pub fn PredictionOverview(state: ReadSignal<MercadoState>) -> impl IntoView {
                          ratio.1 as f32/(ratio.0+ratio.1)as f32*100.0,
                          ratio.1,
                     )}</span><br/>
-                    <progress value={ratio.0} max={ratio.0+ratio.1} />
+                    <progress value={ratio.0} max={ratio.0+ratio.1}>"Ratio"</progress>
                 } /><br/>
                 <a href="" role="button" on:click=move |_| {
                     refresh.set(!refresh.get());
