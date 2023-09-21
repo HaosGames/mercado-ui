@@ -47,9 +47,12 @@ pub async fn get_judge(
         Err("Not logged in".to_string())
     }
 }
-pub async fn get_prediction_bets(request: PredictionRequest) -> Result<Vec<Bet>, String> {
+pub async fn get_bets(
+    request: PredictionUserRequest,
+    access: AccessRequest,
+) -> Result<Vec<Bet>, String> {
     client()
-        .get_prediction_bets(request)
+        .get_bets(request, access)
         .await
         .map_err(map_any_err)
 }

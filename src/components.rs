@@ -315,7 +315,7 @@ pub fn PredictionOverview(state: ReadSignal<MercadoState>) -> impl IntoView {
                 }>"Refresh"</a>
             </p>
             <JudgeList prediction=prediction.clone() judge_count=prediction.judge_count state=state refresh=refresh />
-            <BetList prediction=prediction.id user=None />
+            <BetList prediction=prediction.id state=state />
             <p>"Id: "{prediction.id}</p>
         } />
     }
@@ -444,39 +444,50 @@ pub fn JudgeListItem(
         </tr>
     }
 }
+pub fn empty_view() -> impl IntoView {
+    view! {}.into_view()
+}
 #[component]
-pub fn BetList(prediction: RowId, user: Option<UserPubKey>) -> impl IntoView {
-    let bets = create_local_resource(
-        move || PredictionRequest { prediction, user },
-        move |request| get_prediction_bets(request),
-    );
-    view! {
-        {
-            move || match bets.get() {
-                None => view! {<p>"Loading..."</p>}.into_view(),
-                Some(Ok(bets)) => view! {
-                    <details>
-                        <summary>{format!("Bets: {}", bets.len())}</summary>
-                        <table>
-                            <tr>
-                                <th>"Bet"</th>
-                                <th>"Amount"</th>
-                                <th>"User"</th>
-                            </tr>
-                            <For each=move || bets.clone() key=move |judge| judge.user
-                            view=move |bet: Bet| view!{
+pub fn BetList(prediction: RowId, state: ReadSignal<MercadoState>) -> impl IntoView {
+    if let Some(access) = state.get().access {
+        let bets = create_local_resource(
+            move || PredictionUserRequest {
+                prediction: Some(prediction),
+                user: Some(access.user),
+            },
+            move |request| get_bets(request, access.clone()),
+        );
+        view! {
+            {
+                move || match bets.get() {
+                    None => view! {<p>"Loading..."</p>}.into_view(),
+                    Some(Ok(bets)) => view! {
+                        <details>
+                            <summary>{format!("Bets: {}", bets.len())}</summary>
+                            <table>
                                 <tr>
-                                    <td>{bet.bet}</td>
-                                    <td>{bet.amount.unwrap_or(0)}</td>
-                                    <td><Username user=Some(bet.user) /></td>
+                                    <th>"Bet"</th>
+                                    <th>"Amount"</th>
+                                    <th>"User"</th>
                                 </tr>
-                            }/>
-                        </table>
-                    </details>
-                }.into_view(),
-                Some(Err(e)) => view! {<p>{format!("Got error: {:?}", e)}</p>}.into_view(),
+                                <For each=move || bets.clone() key=move |judge| judge.user
+                                view=move |bet: Bet| view!{
+                                    <tr>
+                                        <td>{bet.bet}</td>
+                                        <td>{bet.amount.unwrap_or(0)}</td>
+                                        <td><Username user=Some(bet.user) /></td>
+                                    </tr>
+                                }/>
+                            </table>
+                        </details>
+                    }.into_view(),
+                    Some(Err(e)) => view! {<p>{format!("Got error: {:?}", e)}</p>}.into_view(),
+                }
             }
         }
+        .into_view()
+    } else {
+        view! {}.into_view()
     }
 }
 #[component]
