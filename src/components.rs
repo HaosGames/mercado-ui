@@ -52,6 +52,7 @@ pub fn Navi(
                                 <li><a>"Predictions"</a></li>
                                 <li><a href="/my_bets">"Bets"</a></li>
                                 <li><a>"Judges"</a></li>
+                                <li><a href="/cash_outs">"Cash Outs"</a></li>
                                 <li><a href="/" on:click=move |_| {set_state.set(MercadoState::default())} >"Logout"</a></li>
                             </ul>
                         </details>
@@ -733,5 +734,83 @@ pub fn AddBet(state: ReadSignal<MercadoState>) -> impl IntoView {
                 } >"Add"</button></label>
             </div>
         </div>
+    }
+}
+#[component]
+pub fn MyCashOuts(state: ReadSignal<MercadoState>) -> impl IntoView {
+    let cash_outs = create_local_resource(
+        move || (None, state.get().access.map(|a| a.user)),
+        move |(prediction, user)| get_cash_outs(prediction, user, state.get().access),
+    );
+
+    view! {
+        <table>
+            <tr>
+                <th>"Prediction"</th>
+                <th>"Amount"</th>
+                <th>"Invoice"</th>
+                <th>"State"</th>
+            </tr>
+            <UnwrapResource resource=move || cash_outs.get() view=move |cash_outs| view! {
+                <For each=move || cash_outs.clone() key=move |cash_out| cash_out.0
+                view=move |(prediction, user): (RowId, UserPubKey)| view!{
+                    <CashOutListItem prediction=prediction user=user state=state />
+                }/>
+            }.into_view() />
+        </table>
+    }
+}
+#[component]
+pub fn CashOutListItem(
+    prediction: RowId,
+    user: UserPubKey,
+    state: ReadSignal<MercadoState>,
+) -> impl IntoView {
+    let refresh = create_rw_signal(true);
+    let cash_out = create_local_resource(
+        move || refresh.get(),
+        move |_| get_cash_out(prediction, user, state.get().access.unwrap()),
+    );
+    let init_cash_out = create_action(move |invoice: &Invoice| {
+        cash_out_user(
+            prediction,
+            user,
+            invoice.clone(),
+            state.get().access.unwrap(),
+        )
+    });
+    let invoice_input = create_rw_signal(generate_keypair(&mut rand::thread_rng()).1.to_string());
+
+    view! {
+        <UnwrapResource resource=move || cash_out.get() view=move |cash_out| view!{
+            <tr>
+                <td><a href=format!("/prediction/{}", prediction)>"Prediction"</a></td>
+                <td>{cash_out.amount}" sats"</td>
+                {
+                    if let Some((invoice, state)) = cash_out.invoice {
+                        if let InvoiceState::Failed = state {
+                            view! {
+                                <td><input type="text" value=invoice_input on:click=move |e| invoice_input.set(event_target_value(&e)) /></td>
+                                <td><a href="" role="button">"Retry Cash Out"</a></td>
+                            }.into_view()
+                        } else {
+                            view! {
+                                <td><small>{invoice}</small></td>
+                                <td>{format!("{:?}", state)}</td>
+                            }.into_view()
+                        }
+                    } else {
+                        view! {
+                            <td><input type="text" value=invoice_input on:click=move |e| invoice_input.set(event_target_value(&e)) /></td>
+                            <td><a href="" role="button" on:click=move |_| {
+                                init_cash_out.dispatch(invoice_input.get());
+                                refresh.set(!refresh.get());
+                            } >"Cash Out"</a></td>
+                        }.into_view()
+                    }
+                }
+            </tr>
+
+        }.into_view() />
     }
 }
