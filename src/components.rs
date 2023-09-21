@@ -116,34 +116,63 @@ pub fn Login(set_state: WriteSignal<MercadoState>) -> impl IntoView {
     }
 }
 #[component]
-pub fn PredictionListItem(prediction: PredictionOverviewResponse) -> impl IntoView {
+pub fn PredictionListItem(
+    prediction: PredictionOverviewResponse,
+    refresh: RwSignal<bool>,
+) -> impl IntoView {
+    let ratio = create_local_resource(
+        move || refresh.get(),
+        move |_| {
+            get_prediction_ratio(PredictionRequest {
+                prediction: prediction.id,
+                user: None,
+            })
+        },
+    );
     view! {
         <tr>
             <td><a href={format!("/prediction/{}", prediction.id)}>{prediction.name}</a></td>
             <td>{prediction.trading_end.to_string()}</td>
             <td>{prediction.judge_share_ppm / 10000}"%"</td>
             <td>{prediction.state.to_string()}</td>
+            <td><UnwrapResource resource=move || ratio.get() view=move |ratio| view! {
+                    <span>{format!("True: {}% ({} sats)",
+                         ratio.0 as f32/(ratio.0+ratio.1)as f32*100.0,
+                         ratio.0,
+                    )}</span>
+                    <span style="float:right">{format!("False: {}% ({} sats)",
+                         ratio.1 as f32/(ratio.0+ratio.1)as f32*100.0,
+                         ratio.1,
+                    )}</span><br/>
+                    <progress value={ratio.0} max={ratio.0+ratio.1}>"Ratio"</progress>
+                } /></td>
         </tr>
     }
 }
 #[component]
 pub fn PredictionList() -> impl IntoView {
     let predictions = create_local_resource(move || {}, get_predictions);
+    let refresh = create_rw_signal(true);
 
     view! {
         <UnwrapResource resource=move || predictions.get() view=move |mut predictions| view! {
-            <p>{predictions.len()}" prediction(s)"</p>
+            <p>{predictions.len()}" prediction(s)"
+                <span style="float:right">
+                    <a href="" role="button" on:click=move |_| refresh.set(!refresh.get())>"Refresh"</a>
+                </span>
+            </p>
             <table role="grid">
                 <tr>
                    <th>"Prediction"</th>
                    <th>"End"</th>
                    <th>"Judge Share"</th>
                    <th>"State"</th>
+                   <th>"Ratio"</th>
                 </tr>
                 {
                     predictions.sort_by(|a, b| a.id.cmp(&b.id));
                     predictions.into_iter()
-                    .map(|prediction| view! {<PredictionListItem prediction=prediction/>})
+                    .map(|prediction| view! {<PredictionListItem prediction=prediction refresh=refresh/>})
                     .collect::<Vec<_>>()
                 }
             </table>
@@ -614,6 +643,7 @@ pub fn AddBet(state: ReadSignal<MercadoState>) -> impl IntoView {
     let (prediction, set_prediction) = create_signal(String::new());
     let (bet, set_bet) = create_signal(String::new());
     let (amount, set_amount) = create_signal(String::new());
+    let message = create_rw_signal(view! {}.into_view());
 
     let add_bet = move || {
         let access = if let Some(access) = state.get().access {
@@ -630,21 +660,17 @@ pub fn AddBet(state: ReadSignal<MercadoState>) -> impl IntoView {
             add_bet(request.clone(), access.clone())
         });
         action.dispatch((request, access));
-        match action.value().get() {
-            Some(Ok(invoice)) => Ok(invoice),
-            None | Some(Err(_)) => {
-                bail!("Got NONE or ERR from action")
-            }
-        }
+        Ok(action)
     };
     view! {
         <div>
             <h3>"New bet"</h3>
-            <label>"Search predictions"
+            <label>"Filter predictions"
                 <input type="search" placeholder="Name or ID" autofocus on:input=move |e| {set_search.set(event_target_value(&e))}/>
             </label>
-            <label>"Prediction"
+            <label>"Prediction "{move || prediction.get()}
                 <select on:input=move |e| {set_prediction.set(event_target_value(&e))}>
+                    <option value="" selected disabled >"Select prediction"</option>
                     <For each=move || {
                         match predictions.get() {
                             Some(Ok(mut predictions)) => {
@@ -686,9 +712,22 @@ pub fn AddBet(state: ReadSignal<MercadoState>) -> impl IntoView {
                 </fieldset>
             </div>
             <div>
-                <a href="" role="button" on:click=move |_| {
-                    add_bet();
-                } >"Add"</a>
+                <label><small>{move || message.get()}</small>
+                <button on:click=move |_| {
+                    match add_bet() {
+                        Ok(action) => {
+                            if action.pending().get() {
+                                message.set(view!{"Loading..."}.into_view());
+                            }
+                            let response = match action.value().get().unwrap() {
+                                Ok(invoice) => view!{{invoice}}.into_view(),
+                                Err(e) => view!{{e.to_string()}}.into_view(),
+                            };
+                            message.set(response);
+                        },
+                        Err(e) => message.set(view!{{e.to_string()}}.into_view())
+                    }
+                } >"Add"</button></label>
             </div>
         </div>
     }
