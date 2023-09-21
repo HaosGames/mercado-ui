@@ -58,7 +58,7 @@ fn main() {
                                 <Route path="" view=App/>
                             </Route>
                             <Route path="login" view=move || view! {<Login set_state=set_state />} />
-                            <Route path="my_bets" view=move || view!{<MyBets access=state />} />
+                            <Route path="my_bets" view=move || view!{<MyBets state=state />} />
                             <Route path="new_prediction" view=move || view!{<NewPrediction state=state />} />
                             <Route path="add_bet" view=move || view!{<AddBet state=state />} />
                             <Route path="cash_outs" view=move || view!{<MyCashOuts state=state />} />

@@ -280,6 +280,15 @@ pub fn PredictionOverview(state: ReadSignal<MercadoState>) -> impl IntoView {
     );
     let force_decision_period =
         create_action(move |&()| force_decision_period(id(), state.get().access.unwrap()));
+    let user = if let Some(user) = state.get().user {
+        if let UserRole::User = user.role {
+            Some(user.user)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
     view! {
         <UnwrapResource resource=prediction view=move |prediction| view! {
             <h3>{prediction.name.clone()}</h3>
@@ -321,7 +330,9 @@ pub fn PredictionOverview(state: ReadSignal<MercadoState>) -> impl IntoView {
                 }>"Refresh"</a>
             </p>
             <JudgeList prediction=prediction.clone() judge_count=prediction.judge_count state=state refresh=refresh />
-            <BetList prediction=prediction.id state=state collapsable=true />
+            <BetList prediction=Some(prediction.id) state=state collapsable=true
+                user=user
+            />
             <p>"Id: "{prediction.id}</p>
         } />
     }
@@ -463,7 +474,8 @@ where
 }
 #[component]
 pub fn BetList(
-    prediction: RowId,
+    prediction: Option<RowId>,
+    user: Option<UserPubKey>,
     state: ReadSignal<MercadoState>,
     #[prop(optional)] collapsable: Option<bool>,
 ) -> impl IntoView {
@@ -473,10 +485,7 @@ pub fn BetList(
         return view! {}.into_view();
     };
     let bets = create_local_resource(
-        move || PredictionUserRequest {
-            prediction: Some(prediction),
-            user: Some(access.user),
-        },
+        move || PredictionUserRequest { prediction, user },
         move |request| get_bets(request, access.clone()),
     );
     let table = move |bets: Vec<Bet>| {
@@ -485,14 +494,20 @@ pub fn BetList(
                 <tr>
                     <th>"Bet"</th>
                     <th>"Amount"</th>
-                    <th>"User"</th>
+                    <Cond cond=user.is_none() view=view!{<th>"User"</th>}/>
+                    <Cond cond=prediction.is_none() view=view!{<th>"Prediction"</th>}/>
+                    <th>"State"</th>
+                    <th>"Invoice"</th>
                 </tr>
                 <For each=move || bets.clone() key=move |judge| judge.user
                 view=move |bet: Bet| view!{
                     <tr>
                         <td>{bet.bet}</td>
                         <td>{bet.amount.unwrap_or(0)}</td>
-                        <td><Username user=Some(bet.user) /></td>
+                        <Cond cond=user.is_none() view=view!{<td><Username user=Some(bet.user) /></td>}/>
+                        <Cond cond=prediction.is_none() view=view!{<td><a href={format!("/prediction/{}", bet.prediction)}>"Prediction"</a></td>}/>
+                        <td>{bet.state.to_string()}</td>
+                        <td><ShortenedString string=bet.fund_invoice /></td>
                     </tr>
                 }/>
             </table>
@@ -581,29 +596,19 @@ pub fn Username(
     }}
 }
 #[component]
-pub fn MyBets(access: ReadSignal<MercadoState>) -> impl IntoView {
-    let bets = create_local_resource(move || access.get().access, my_bets);
+pub fn MyBets(state: ReadSignal<MercadoState>) -> impl IntoView {
+    let user = if let Some(user) = state.get().user {
+        if let UserRole::User = user.role {
+            Some(user.user)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
 
     view! {
-        <table>
-            <tr>
-                <th>"Bet"</th>
-                <th>"Amount"</th>
-                <th>"Prediction"</th>
-                <th>"State"</th>
-                <th>"Invoice"</th>
-            </tr>
-            <For each=move || bets.get().transpose().ok().flatten().unwrap_or_default() key=move |bet| bet.user
-            view=move |bet: Bet| view!{
-                <tr>
-                    <td>{bet.bet}</td>
-                    <td>{bet.amount.unwrap_or(0)}</td>
-                    <td><a href={format!("/prediction/{}", bet.prediction)}>"Prediction"</a></td>
-                    <td>{bet.state.to_string()}</td>
-                    <td><ShortenedString string=bet.fund_invoice /></td>
-                </tr>
-            }/>
-        </table>
+        <BetList state=state prediction=None user=user />
     }
 }
 #[component]
