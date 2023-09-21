@@ -506,7 +506,13 @@ pub fn BetList(
                         <td>{bet.amount.unwrap_or(0)}</td>
                         <Cond cond=user.is_none() view=view!{<td><Username user=Some(bet.user) /></td>}/>
                         <Cond cond=prediction.is_none() view=view!{<td><a href={format!("/prediction/{}", bet.prediction)}>"Prediction"</a></td>}/>
-                        <td>{bet.state.to_string()}</td>
+                        <td>{bet.state.to_string()}
+                            {
+                                if let BetState::FundInit = bet.state {
+                                    view!{" "<a href="" ><small>"Check"</small></a>}.into_view()
+                                } else {view!{}.into_view()}
+                            }
+                        </td>
                         <td><ShortenedString string=bet.fund_invoice /></td>
                     </tr>
                 }/>
