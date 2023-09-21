@@ -467,7 +467,7 @@ pub fn BetList(prediction: RowId, user: Option<UserPubKey>) -> impl IntoView {
                                 <tr>
                                     <td>{bet.bet}</td>
                                     <td>{bet.amount.unwrap_or(0)}</td>
-                                    <td>{bet.user.to_string()}</td>
+                                    <td><Username user=Some(bet.user) /></td>
                                 </tr>
                             }/>
                         </table>
@@ -481,13 +481,16 @@ pub fn BetList(prediction: RowId, user: Option<UserPubKey>) -> impl IntoView {
 #[component]
 pub fn Username(user: Option<UserPubKey>) -> impl IntoView {
     let usernames = create_local_resource(move || user.unwrap(), get_username);
-
     view! {{
         move || {
             if let Some(user) = user {
                 let name = usernames.get().transpose().ok().flatten().unwrap_or_default();
                 if name.is_empty() {
-                    user.to_string().into_view()
+                    let mut user = user.to_string();
+                    let end = user.split_off(59);
+                    user.truncate(8);
+                    user = user + "..." + end.as_str();
+                    view!{<small>{user}</small>}.into_view()
                 } else {
                     view! {<span title={user.to_string()} >{name}</span>}.into_view()
                 }
