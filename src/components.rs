@@ -480,6 +480,13 @@ pub fn BetList(prediction: RowId, user: Option<UserPubKey>) -> impl IntoView {
     }
 }
 #[component]
+pub fn ShortenedString(mut string: String) -> impl IntoView {
+    let end = string.split_off(59);
+    string.truncate(8);
+    string = string + "..." + end.as_str();
+    view! {<small>{string}</small>}.into_view()
+}
+#[component]
 pub fn Username(user: Option<UserPubKey>) -> impl IntoView {
     let usernames = create_local_resource(move || user.unwrap(), get_username);
     view! {{
@@ -488,10 +495,7 @@ pub fn Username(user: Option<UserPubKey>) -> impl IntoView {
                 let name = usernames.get().transpose().ok().flatten().unwrap_or_default();
                 if name.is_empty() {
                     let mut user = user.to_string();
-                    let end = user.split_off(59);
-                    user.truncate(8);
-                    user = user + "..." + end.as_str();
-                    view!{<small>{user}</small>}.into_view()
+                    view!{<ShortenedString string=user />}.into_view()
                 } else {
                     view! {<span title={user.to_string()} >{name}</span>}.into_view()
                 }
@@ -521,7 +525,7 @@ pub fn MyBets(access: ReadSignal<MercadoState>) -> impl IntoView {
                     <td>{bet.amount.unwrap_or(0)}</td>
                     <td><a href={format!("/prediction/{}", bet.prediction)}>"Prediction"</a></td>
                     <td>{bet.state.to_string()}</td>
-                    <td><small>{bet.fund_invoice}</small></td>
+                    <td><ShortenedString string=bet.fund_invoice /></td>
                 </tr>
             }/>
         </table>
@@ -585,7 +589,7 @@ pub fn NewPrediction(state: ReadSignal<MercadoState>) -> impl IntoView {
             <ul>
             <For each=move || judges.get() key=move |judge| judge.clone()
                 view=move |judge: UserPubKey| view!{
-                    <li>{judge.to_string()}" "
+                    <li><ShortenedString string=judge.to_string() />" "
                         <a href="#" role="button" class="contrast"
                             on:click=move |_| {
                                 let mut judges = judges.get();
@@ -795,7 +799,7 @@ pub fn CashOutListItem(
                             }.into_view()
                         } else {
                             view! {
-                                <td><small>{invoice}</small></td>
+                                <td><ShortenedString string=invoice /></td>
                                 <td>{format!("{:?}", state)}</td>
                             }.into_view()
                         }
