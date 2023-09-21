@@ -136,7 +136,7 @@ pub fn PredictionListItem(
             <td>{prediction.trading_end.to_string()}</td>
             <td>{prediction.judge_share_ppm / 10000}"%"</td>
             <td>{prediction.state.to_string()}</td>
-            <td><UnwrapResource resource=move || ratio.get() view=move |ratio| view! {
+            <td><UnwrapResource resource=ratio view=move |ratio| view! {
                     <span>{format!("True: {}% ({} sats)",
                          ratio.0 as f32/(ratio.0+ratio.1)as f32*100.0,
                          ratio.0,
@@ -156,7 +156,7 @@ pub fn PredictionList() -> impl IntoView {
     let refresh = create_rw_signal(true);
 
     view! {
-        <UnwrapResource resource=move || predictions.get() view=move |mut predictions| view! {
+        <UnwrapResource resource=predictions view=move |mut predictions| view! {
             <p>{predictions.len()}" prediction(s)"
                 <span style="float:right">
                     <a href="" role="button" on:click=move |_| refresh.set(!refresh.get())>"Refresh"</a>
@@ -181,15 +181,19 @@ pub fn PredictionList() -> impl IntoView {
     }
 }
 #[component]
-pub fn UnwrapResource<F, V, T, R>(view: F, resource: R) -> impl IntoView
+pub fn UnwrapResource<F, V, T, S>(
+    view: F,
+    resource: Resource<S, Result<T, String>>,
+) -> impl IntoView
 where
     F: Fn(T) -> V + 'static,
-    R: Fn() -> Option<Result<T, String>> + 'static,
     V: IntoView,
+    T: Clone + 'static,
+    S: Clone + 'static,
 {
     view! {
         {
-            move || match resource() {
+            move || match resource.get() {
                 None => view! {<small>"Loading..."</small>}.into_view(),
                 Some(Ok(t)) => view(t).into_view(),
                 Some(Err(e)) => view! {<small>{format!("{:?}", e)}</small>}.into_view(),
@@ -198,16 +202,17 @@ where
     }
 }
 #[component]
-pub fn UnwrapResourceForUser<F, V, T, R>(
+pub fn UnwrapResourceForUser<F, V, T, S>(
     view: F,
-    resource: R,
+    resource: Resource<S, Result<T, String>>,
     user: UserPubKey,
     state: ReadSignal<MercadoState>,
 ) -> impl IntoView
 where
     F: Fn(T) -> V + 'static,
-    R: Fn() -> Option<Result<T, String>> + 'static,
     V: IntoView,
+    T: Clone + 'static,
+    S: Clone + 'static,
 {
     if let Some(access) = state.get_untracked().access {
         if let Some(storage_user) = state.get_untracked().user {
@@ -234,15 +239,16 @@ where
     }
 }
 #[component]
-pub fn UnwrapResourceFor<F, V, T, R>(
+pub fn UnwrapResourceFor<F, V, T, S>(
     view: F,
-    resource: R,
+    resource: Resource<S, Result<T, String>>,
     state: ReadSignal<MercadoState>,
 ) -> impl IntoView
 where
     F: Fn(T) -> V + 'static,
-    R: Fn() -> Option<Result<T, String>> + 'static,
     V: IntoView,
+    T: Clone + 'static,
+    S: Clone + 'static,
 {
     if let Some(access) = state.get_untracked().access {
         view! {
@@ -275,7 +281,7 @@ pub fn PredictionOverview(state: ReadSignal<MercadoState>) -> impl IntoView {
     let force_decision_period =
         create_action(move |&()| force_decision_period(id(), state.get().access.unwrap()));
     view! {
-        <UnwrapResource resource=move || prediction.get() view=move |prediction| view! {
+        <UnwrapResource resource=prediction view=move |prediction| view! {
             <h3>{prediction.name.clone()}</h3>
             <p>"State: "{prediction.state.to_string()}
             {
@@ -299,7 +305,7 @@ pub fn PredictionOverview(state: ReadSignal<MercadoState>) -> impl IntoView {
             "Decision period: "{prediction.decision_period_sec/86400}" days"<br/>
             </p>
             <p>
-                <UnwrapResource resource=move || ratio.get() view=move |ratio| view! {
+                <UnwrapResource resource=ratio view=move |ratio| view! {
                     <span>{format!("True: {}% ({} sats)",
                          ratio.0 as f32/(ratio.0+ratio.1)as f32*100.0,
                          ratio.0,
@@ -315,7 +321,7 @@ pub fn PredictionOverview(state: ReadSignal<MercadoState>) -> impl IntoView {
                 }>"Refresh"</a>
             </p>
             <JudgeList prediction=prediction.clone() judge_count=prediction.judge_count state=state refresh=refresh />
-            <BetList prediction=prediction.id state=state />
+            <BetList prediction=prediction.id state=state collapsable=true />
             <p>"Id: "{prediction.id}</p>
         } />
     }
@@ -334,7 +340,7 @@ pub fn JudgeList(
     );
     view! {
         <UnwrapResource
-            resource=move || judges.get()
+            resource=judges
             view=move |judges| view! {
             <details open>
                 <summary>{format!("Judges: {}/{}", judge_count, judges.len())}</summary>
@@ -387,13 +393,13 @@ pub fn JudgeListItem(
             <td><UnwrapResourceForUser
                 user=judge.user
                 state=state
-                resource=move || judge_priv.get()
+                resource=judge_priv
                 view=move |judge| judge.state.to_string()
             /></td>
             <td><UnwrapResourceForUser
             user=judge.user
             state=state
-            resource=move || judge_priv.get()
+            resource=judge_priv
             view= move |judge| {
                 match prediction_state {
                     MarketState::WaitingForJudges => {
@@ -444,50 +450,69 @@ pub fn JudgeListItem(
         </tr>
     }
 }
-pub fn empty_view() -> impl IntoView {
-    view! {}.into_view()
-}
 #[component]
-pub fn BetList(prediction: RowId, state: ReadSignal<MercadoState>) -> impl IntoView {
-    if let Some(access) = state.get().access {
-        let bets = create_local_resource(
-            move || PredictionUserRequest {
-                prediction: Some(prediction),
-                user: Some(access.user),
-            },
-            move |request| get_bets(request, access.clone()),
-        );
-        view! {
-            {
-                move || match bets.get() {
-                    None => view! {<p>"Loading..."</p>}.into_view(),
-                    Some(Ok(bets)) => view! {
-                        <details>
-                            <summary>{format!("Bets: {}", bets.len())}</summary>
-                            <table>
-                                <tr>
-                                    <th>"Bet"</th>
-                                    <th>"Amount"</th>
-                                    <th>"User"</th>
-                                </tr>
-                                <For each=move || bets.clone() key=move |judge| judge.user
-                                view=move |bet: Bet| view!{
-                                    <tr>
-                                        <td>{bet.bet}</td>
-                                        <td>{bet.amount.unwrap_or(0)}</td>
-                                        <td><Username user=Some(bet.user) /></td>
-                                    </tr>
-                                }/>
-                            </table>
-                        </details>
-                    }.into_view(),
-                    Some(Err(e)) => view! {<p>{format!("Got error: {:?}", e)}</p>}.into_view(),
-                }
-            }
-        }
-        .into_view()
+pub fn Cond<V>(cond: bool, view: V) -> impl IntoView
+where
+    V: IntoView,
+{
+    if cond {
+        view.into_view()
     } else {
         view! {}.into_view()
+    }
+}
+#[component]
+pub fn BetList(
+    prediction: RowId,
+    state: ReadSignal<MercadoState>,
+    #[prop(optional)] collapsable: Option<bool>,
+) -> impl IntoView {
+    let access = if let Some(access) = state.get_untracked().access {
+        access
+    } else {
+        return view! {}.into_view();
+    };
+    let bets = create_local_resource(
+        move || PredictionUserRequest {
+            prediction: Some(prediction),
+            user: Some(access.user),
+        },
+        move |request| get_bets(request, access.clone()),
+    );
+    let table = move |bets: Vec<Bet>| {
+        view! {
+            <table>
+                <tr>
+                    <th>"Bet"</th>
+                    <th>"Amount"</th>
+                    <th>"User"</th>
+                </tr>
+                <For each=move || bets.clone() key=move |judge| judge.user
+                view=move |bet: Bet| view!{
+                    <tr>
+                        <td>{bet.bet}</td>
+                        <td>{bet.amount.unwrap_or(0)}</td>
+                        <td><Username user=Some(bet.user) /></td>
+                    </tr>
+                }/>
+            </table>
+        }
+    };
+    if let Some(true) = collapsable {
+        view! {
+            <UnwrapResourceFor state=state resource=bets view=move |bets| view!{
+                <details>
+                    <summary>{format!("Bets: {}", bets.len())}</summary>
+                    {table(bets)}
+                </details>
+            } />
+        }
+    } else {
+        view! {
+            <UnwrapResourceFor state=state resource=bets view=move |bets| view!{
+                {table(bets)}
+            } />
+        }
     }
 }
 #[component]
@@ -805,7 +830,7 @@ pub fn MyCashOuts(state: ReadSignal<MercadoState>) -> impl IntoView {
                 <th>"Invoice"</th>
                 <th>"State"</th>
             </tr>
-            <UnwrapResource resource=move || cash_outs.get() view=move |cash_outs| view! {
+            <UnwrapResource resource=cash_outs view=move |cash_outs| view! {
                 <For each=move || cash_outs.clone() key=move |cash_out| cash_out.0
                 view=move |(prediction, user): (RowId, UserPubKey)| view!{
                     <CashOutListItem prediction=prediction user=user state=state />
@@ -836,7 +861,7 @@ pub fn CashOutListItem(
     let invoice_input = create_rw_signal(generate_keypair(&mut rand::thread_rng()).1.to_string());
 
     view! {
-        <UnwrapResource resource=move || cash_out.get() view=move |cash_out| view!{
+        <UnwrapResource resource=cash_out view=move |cash_out| view!{
             <tr>
                 <td><a href=format!("/prediction/{}", prediction)>"Prediction"</a></td>
                 <td>{cash_out.amount}" sats"</td>
