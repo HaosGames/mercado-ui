@@ -196,7 +196,7 @@ where
             move || match resource.get() {
                 None => view! {<small>"Loading..."</small>}.into_view(),
                 Some(Ok(t)) => view(t).into_view(),
-                Some(Err(e)) => view! {<small>{format!("{:?}", e)}</small>}.into_view(),
+                Some(Err(e)) => view! {<small>{format!("{:#}", e)}</small>}.into_view(),
             }
         }
     }
