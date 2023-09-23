@@ -528,7 +528,7 @@ pub fn BetList(
                     <Cond cond=user.is_none() view=view!{<th>"User"</th>}/>
                     <Cond cond=prediction.is_none() view=view!{<th>"Prediction"</th>}/>
                     <th>"State"</th>
-                    <th>"Invoice"</th>
+                    <th>"Payment"</th>
                 </tr>
                 <For each=move || bets.clone() key=move |judge| judge.user
                 view=move |bet: Bet| view!{
@@ -885,7 +885,7 @@ pub fn MyCashOuts(state: ReadSignal<MercadoState>) -> impl IntoView {
             <tr>
                 <th>"Prediction"</th>
                 <th>"Amount"</th>
-                <th>"Invoice"</th>
+                <th>"Payment"</th>
                 <th>"State"</th>
             </tr>
             <UnwrapResource resource=cash_outs view=move |cash_outs| view! {
@@ -908,7 +908,7 @@ pub fn CashOutListItem(
         move || refresh.get(),
         move |_| get_cash_out(prediction, user, state.get().access.unwrap()),
     );
-    let init_cash_out = create_action(move |invoice: &Invoice| {
+    let init_cash_out = create_action(move |invoice: &Payment| {
         cash_out_user(
             prediction,
             user,
