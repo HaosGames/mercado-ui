@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 use crate::{fetchers::*, MercadoState};
-use anyhow::bail;
+use anyhow::{bail, Context};
 use chrono::DateTime;
 use chrono::{offset::Utc, Duration};
 use leptos::{html::Input, *};
@@ -196,7 +196,7 @@ where
             move || match resource.get() {
                 None => view! {<small>"Loading..."</small>}.into_view(),
                 Some(Ok(t)) => view(t).into_view(),
-                Some(Err(e)) => view! {<small>{format!("{:#}", e)}</small>}.into_view(),
+                Some(Err(e)) => view! {<small>{format!("{}", e)}</small>}.into_view(),
             }
         }
     }
@@ -280,7 +280,7 @@ pub fn PredictionOverview(state: ReadSignal<MercadoState>) -> impl IntoView {
     );
     let force_decision_period =
         create_action(move |&()| force_decision_period(id(), state.get().access.unwrap()));
-    let user = if let Some(user) = state.get().user {
+    let user = if let Some(user) = state.get_untracked().user {
         if let UserRole::User = user.role {
             Some(user.user)
         } else {
@@ -683,7 +683,13 @@ pub fn NewPrediction(state: ReadSignal<MercadoState>) -> impl IntoView {
         Err(_e) => "".into_view(),
     };
 
-    let (create_message, set_create_message) = create_signal(view! {}.into_view());
+    let new_prediction_action =
+        create_action(|request: &NewPredictionRequest| new_prediction(request.clone()));
+    let message = create_rw_signal(Some(view! {}.into_view()));
+    let new_prediction_id = create_local_resource(
+        move || new_prediction_action.version().get(),
+        move |_| fetch_rw_signal(new_prediction_action.value()),
+    );
 
     view! {
         <div>
@@ -735,42 +741,46 @@ pub fn NewPrediction(state: ReadSignal<MercadoState>) -> impl IntoView {
                     </li>
                 } />
             </ul>
-            {move || create_message.get()}
+            {
+                move || {
+                    if let Some(message) = message.get() {
+                        message
+                    } else {
+                        match new_prediction_id.get().flatten() {
+                            Some(Ok(rowid)) => {
+                                view!{<Redirect path={format!("/prediction/{}", rowid)} />}.into_view()
+                            }
+                            Some(Err(e)) => {
+                                view!{<label>{format!("{:?}", e)}</label>}.into_view()
+                            }
+                            None => {
+                                view!{}.into_view()
+                            }
+                        }
+                    }
+                }
+            }
             <button on:click=move |_| {
                 let result = move || {
                     let request = NewPredictionRequest {
-                        decision_period_sec: decision.get().parse::<u32>()? * 86400,
-                        judge_count: judge_count.get().parse()?,
-                        judge_share_ppm: judge_share.get().parse()?,
+                        decision_period_sec: decision.get().parse::<u32>().context("Decision period needs to be a number")? * 86400,
+                        judge_count: judge_count.get().parse().context("Judge count needs to be a number")?,
+                        judge_share_ppm: judge_share.get().parse().context("Judge share needs to be a number")?,
                         judges: judges.get(),
                         prediction: prediction.get(),
-                        trading_end: parsed_end()?
+                        trading_end: parsed_end().context("Trading end needs to be in a valid format")?
                     };
-                    let new_prediction_id = create_action(|request: &NewPredictionRequest| new_prediction(request.clone()));
-                    new_prediction_id.dispatch(request);
-                    match new_prediction_id.value().get() {
-                        Some(Ok(rowid)) => {
-                            Ok(rowid)
-                        }
-                        Some(Err(e)) => {
-                            bail!("{:?}", e)
-                        }
-                        None => {
-                            bail!("Got NONE from action")
-                        }
-                    }
+                    new_prediction_action.dispatch(request);
+                    Ok::<(),anyhow::Error>(())
                 };
                 match result() {
-                    Ok(rowid) => {
-                        //FIXME this branch doesn't get called because we only get NONE from the
-                        //action
-                        let navigate = leptos_router::use_navigate();
-                        navigate(format!("/prediction/{}", rowid).as_str(), Default::default());
+                    Ok(_) => {
+                        message.set(None)
                     }
                     Err(e) => {
-                        set_create_message.set(view!{
-                            <label>{format!("{:?}", e)}</label>
-                        }.into_view());
+                        message.set(Some(view!{
+                            <label>{format!("{}", e)}</label>
+                        }.into_view()));
                     }
                 }
             } >"Create"</button>

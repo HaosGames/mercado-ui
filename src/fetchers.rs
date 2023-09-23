@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use crate::{MercadoState, URL};
-use leptos::{ReadSignal, SignalGetUntracked, SignalSet, WriteSignal};
+use leptos::{ReadSignal, Resource, RwSignal, SignalGetUntracked, SignalSet, WriteSignal};
 use mercado::api::*;
 use mercado::client::Client;
 use mercado::secp256k1::ecdsa::Signature;
@@ -214,4 +214,10 @@ pub async fn cash_out_user(
         )
         .await
         .map_err(map_any_err)
+}
+pub async fn fetch_rw_signal<T>(signal: RwSignal<T>) -> T
+where
+    T: Clone,
+{
+    signal.get_untracked()
 }
