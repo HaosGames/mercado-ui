@@ -925,7 +925,7 @@ pub fn CashOutListItem(
                 <td>{cash_out.amount}" sats"</td>
                 {
                     if let Some((invoice, state)) = cash_out.invoice {
-                        if let InvoiceState::Failed = state {
+                        if let PaymentState::Failed = state {
                             view! {
                                 <td><input type="text" value=invoice_input on:click=move |e| invoice_input.set(event_target_value(&e)) /></td>
                                 <td><a href="" role="button">"Retry Cash Out"</a></td>
