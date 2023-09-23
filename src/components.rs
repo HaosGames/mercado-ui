@@ -794,8 +794,11 @@ pub fn AddBet(state: ReadSignal<MercadoState>) -> impl IntoView {
     let (prediction, set_prediction) = create_signal(String::new());
     let (bet, set_bet) = create_signal(String::new());
     let (amount, set_amount) = create_signal(String::new());
-    let message = create_rw_signal(view! {}.into_view());
+    let message = create_rw_signal(None);
 
+    let create_new_bet = create_action(|(request, access): &(AddBetRequest, AccessRequest)| {
+        add_bet(request.clone(), access.clone())
+    });
     let add_bet = move || {
         let access = if let Some(access) = state.get().access {
             access
@@ -803,16 +806,17 @@ pub fn AddBet(state: ReadSignal<MercadoState>) -> impl IntoView {
             bail!("Not logged in")
         };
         let request = AddBetRequest {
-            bet: bet.get().parse()?,
-            prediction: prediction.get().parse()?,
+            prediction: prediction.get().parse().context("Choose a prediction")?,
+            bet: bet.get().parse().context("Choose True or False")?,
             user: access.user,
         };
-        let action = create_action(|(request, access): &(AddBetRequest, AccessRequest)| {
-            add_bet(request.clone(), access.clone())
-        });
-        action.dispatch((request, access));
-        Ok(action)
+        create_new_bet.dispatch((request, access));
+        Ok(())
     };
+    let created_bet = create_local_resource(
+        move || create_new_bet.version().get(),
+        move |_| fetch_rw_signal(create_new_bet.value()),
+    );
     view! {
         <div>
             <h3>"New bet"</h3>
@@ -862,24 +866,33 @@ pub fn AddBet(state: ReadSignal<MercadoState>) -> impl IntoView {
                     </label>
                 </fieldset>
             </div>
-            <div>
-                <label><small>{move || message.get()}</small>
-                <button on:click=move |_| {
-                    match add_bet() {
-                        Ok(action) => {
-                            if action.pending().get() {
-                                message.set(view!{"Loading..."}.into_view());
+            <label><small>
+            {
+                move || {
+                    if let Some(message) = message.get() {
+                        message
+                    } else {
+                        match created_bet.get().flatten() {
+                            Some(Ok(payment)) => {
+                                //TODO redirect to bet status page to enable paying
+                                view!{<Redirect path={format!("/")} />}.into_view()
                             }
-                            let response = match action.value().get().unwrap() {
-                                Ok(invoice) => view!{{invoice}}.into_view(),
-                                Err(e) => view!{{e.to_string()}}.into_view(),
-                            };
-                            message.set(response);
-                        },
-                        Err(e) => message.set(view!{{e.to_string()}}.into_view())
+                            Some(Err(e)) => {
+                                format!("{:?}", e).into_view()
+                            }
+                            None => {
+                                view!{}.into_view()
+                            }
+                        }
                     }
-                } >"Add"</button></label>
-            </div>
+                }
+            }</small>
+            <button on:click=move |_| {
+                match add_bet() {
+                    Ok(action) => message.set(None),
+                    Err(e) => message.set(Some(e.to_string().into_view())),
+                }
+            } >"Add"</button></label>
         </div>
     }
 }
