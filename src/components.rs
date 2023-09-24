@@ -935,8 +935,8 @@ pub fn CashOutListItem(
     let invoice_input = create_rw_signal(generate_keypair(&mut rand::thread_rng()).1.to_string());
 
     view! {
+    <tr>
         <UnwrapResource resource=cash_out view=move |cash_out| view!{
-            <tr>
                 <td><a href=format!("/prediction/{}", prediction)>"Prediction"</a></td>
                 <td>{cash_out.amount}" sats"</td>
                 {
@@ -962,8 +962,8 @@ pub fn CashOutListItem(
                         }.into_view()
                     }
                 }
-            </tr>
 
-        }.into_view() />
+
+        }.into_view() /></tr>
     }
 }
