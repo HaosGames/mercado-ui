@@ -537,7 +537,7 @@ pub fn BetList(
                                 } else {view!{}.into_view()}
                             }
                         </td>
-                        <td><ShortenedString string=bet.fund_invoice /></td>
+                        <td><ShortenedString string=bet.fund_payment /></td>
                     </tr>
                 }/>
             </table>
