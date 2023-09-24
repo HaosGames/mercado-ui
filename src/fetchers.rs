@@ -200,7 +200,7 @@ pub async fn get_cash_outs(
 pub async fn cash_out_user(
     prediction: RowId,
     user: UserPubKey,
-    invoice: Payment,
+    payment: Payment,
     access: AccessRequest,
 ) -> Result<Sats, String> {
     client()
@@ -208,7 +208,7 @@ pub async fn cash_out_user(
             CashOutUserRequest {
                 prediction,
                 user,
-                invoice,
+                payment,
             },
             access,
         )

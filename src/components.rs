@@ -940,7 +940,7 @@ pub fn CashOutListItem(
                 <td><a href=format!("/prediction/{}", prediction)>"Prediction"</a></td>
                 <td>{cash_out.amount}" sats"</td>
                 {
-                    if let Some((invoice, state)) = cash_out.invoice {
+                    if let Some((payment, state)) = cash_out.payment {
                         if let PaymentState::Failed = state {
                             view! {
                                 <td><input type="text" value=invoice_input on:click=move |e| invoice_input.set(event_target_value(&e)) /></td>
@@ -948,7 +948,7 @@ pub fn CashOutListItem(
                             }.into_view()
                         } else {
                             view! {
-                                <td><ShortenedString string=invoice /></td>
+                                <td><ShortenedString string=payment /></td>
                                 <td>{format!("{:?}", state)}</td>
                             }.into_view()
                         }
