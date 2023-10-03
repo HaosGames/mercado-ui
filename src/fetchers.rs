@@ -167,6 +167,30 @@ pub async fn make_decision(
         .await
         .map_err(map_any_err)
 }
+pub async fn get_balance(user: UserPubKey, access: AccessRequest) -> Result<Sats, String> {
+    client()
+        .get_balance(user, access)
+        .await
+        .map_err(map_any_err)
+}
+pub async fn get_available_balance(
+    user: UserPubKey,
+    access: AccessRequest,
+) -> Result<Sats, String> {
+    client()
+        .get_available_balance(user, access)
+        .await
+        .map_err(map_any_err)
+}
+pub async fn get_balances_for(access: Option<AccessRequest>) -> Result<(Sats, Sats), String> {
+    if let Some(access) = access {
+        let balance = get_balance(access.clone().user, access.clone()).await?;
+        let available_balance = get_available_balance(access.clone().user, access).await?;
+        Ok((available_balance, balance))
+    } else {
+        Err("Not logged in".to_string())
+    }
+}
 pub async fn force_decision_period(prediction: RowId, access: AccessRequest) -> Result<(), String> {
     client()
         .force_decision_period(prediction, access)

@@ -22,6 +22,7 @@ pub fn Navi(
     set_state: WriteSignal<MercadoState>,
 ) -> impl IntoView {
     let check_login = create_local_resource(move || state.get().access, check_login);
+    let balances = create_local_resource(move || {}, move |_| get_balances_for(state.get().access));
     view! {
         <nav class="container">
             <ul>
@@ -36,6 +37,9 @@ pub fn Navi(
             <ul>
             <li><a href="/"><strong>"Mercado"</strong></a></li>
             </ul>
+            <UnwrapResourceFor state=state resource=balances view=move |balances| { view! {
+                <li>{balances.0}"/"{balances.1}" sats"</li>
+            }} />
             <ul><li>{
                 move || if state.get().access.is_some() && check_login.get().transpose().ok().flatten().is_some() {
                     view!{
@@ -304,31 +308,21 @@ pub fn PredictionOverview(state: ReadSignal<MercadoState>) -> impl IntoView {
                     } else {view!{}.into_view()}
                 } else {view!{}.into_view()}
             }
-            <table>
-                <tr>
-                    <th>"State"</th>
-                    <th>"End"</th>
-                    <th>"Time left"</th>
-                    <th>"Judge share"</th>
-                    <th>"Judge count"</th>
-                    <th>"Decision period"</th>
-                </tr>
-                <tr>
-                    <td>{prediction.state.to_string()}</td>
-                    <td>{prediction.trading_end.to_string()}</td>
-                    <td>{
+            <p>
+                "State: "<kbd>{prediction.state.to_string()}</kbd><br/>
+                "End: "{prediction.trading_end.to_string()}<br/>
+                "Time left: "{
                         let left = (prediction.trading_end - Utc::now());
                         format!("{} weeks {} days {} hours",
                             left.num_weeks(),
                             left.num_days() % 7,
                             left.num_hours() % 24
                         )
-                    }</td>
-                    <td>{prediction.judge_share_ppm as f32/10000.0}"%"</td>
-                    <td>{prediction.judge_count}</td>
-                    <td>{prediction.decision_period_sec/86400}" days"</td>
-                </tr>
-            </table>
+                    }<br/>
+                "Judge share: "{prediction.judge_share_ppm as f32/10000.0}"%"<br/>
+                "Judges: "{prediction.judge_count}<br/>
+                "Decision period: "{prediction.decision_period_sec/86400}" days"
+            </p>
             <p>
                 <UnwrapResource resource=ratio view=move |ratio| view! {
                     <span>{format!("True: {}% ({} sats)",
@@ -339,8 +333,9 @@ pub fn PredictionOverview(state: ReadSignal<MercadoState>) -> impl IntoView {
                          ratio.1 as f32/(ratio.0+ratio.1)as f32*100.0,
                          ratio.1,
                     )}</span><br/>
-                    <progress value={ratio.0} max={ratio.0+ratio.1}>"Ratio"</progress>
-                } /><br/>
+                    <progress value={ratio.0} max={ratio.0+ratio.1}>"Ratio"</progress><br/>
+                    <p style="text-align:center">"Total: "{ratio.0+ratio.1}" sats"</p>
+                } />
                 <a href="" role="button" on:click=move |_| {
                     refresh.set(!refresh.get());
                 }>"Refresh"</a>
