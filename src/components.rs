@@ -22,50 +22,61 @@ pub fn Navi(
     set_state: WriteSignal<MercadoState>,
 ) -> impl IntoView {
     let check_login = create_local_resource(move || state.get().access, check_login);
-    let balances = create_local_resource(move || {}, move |_| get_balances_for(state.get().access));
     view! {
         <nav class="container">
             <ul>
-                <details role="list" >
-                    <summary aria-haspopup="listbox" role="link" >"New"</summary>
-                    <ul role="listbox">
-                        <li><A href="/new_prediction">"Prediction"</A></li>
-                        <li><A href="/add_bet">"Bet"</A></li>
-                    </ul>
-                </details>
+                <li><a href="/"><strong>"Mercado"</strong></a></li>
+                <li>
+                    <details role="list" >
+                        <summary aria-haspopup="listbox" role="link" >"New"</summary>
+                        <ul role="listbox">
+                            <li><A href="/new_prediction">"Prediction"</A></li>
+                            <li><A href="/add_bet">"Bet"</A></li>
+                        </ul>
+                    </details>
+                </li>
             </ul>
             <ul>
-            <li><a href="/"><strong>"Mercado"</strong></a></li>
+                {move || {
+                    let access = if let Some(access) = state.get().access {
+                        access
+                    } else {
+                        return view! {}.into_view();
+                    };
+                    let balances = create_local_resource(move || {}, move |_| get_balances_for(access.clone()));
+                    view!{
+                        <UnwrapResourceFor state=state resource=balances view=move |balances| { view! {
+                            <li>{balances.0}"/"{balances.1}" sats"</li>
+                        }} />
+                    }.into_view()
+                }}
+                <li>{
+                    move || if state.get().access.is_some() && check_login.get().transpose().ok().flatten().is_some() {
+                        view!{
+                            <details role="list" >
+                                <summary aria-haspopup="listbox" role="link" ><Username user={
+                                    if let Some(access) = state.get().access {
+                                        Some(access.user)
+                                    } else {
+                                        None
+                                    }
+                                } no_clipboard=true /></summary>
+                                <ul role="listbox">
+                                    <li><a>"Edit user"</a></li>
+                                    <li><a>"Predictions"</a></li>
+                                    <li><a href="/my_bets">"Bets"</a></li>
+                                    <li><a href="/my_judges">"Judges"</a></li>
+                                    <li><a href="/" on:click=move |_| {set_state.set(MercadoState::default())} >"Logout"</a></li>
+                                </ul>
+                            </details>
+                        }.into_view()
+                    } else {
+                        view!{
+                            <a href="/login">"Login"</a>
+                        }.into_view()
+                    }
+                }</li>
             </ul>
-            <UnwrapResourceFor state=state resource=balances view=move |balances| { view! {
-                <li>{balances.0}"/"{balances.1}" sats"</li>
-            }} />
-            <ul><li>{
-                move || if state.get().access.is_some() && check_login.get().transpose().ok().flatten().is_some() {
-                    view!{
-                        <details role="list" >
-                            <summary aria-haspopup="listbox" role="link" ><Username user={
-                                if let Some(access) = state.get().access {
-                                    Some(access.user)
-                                } else {
-                                    None
-                                }
-                            } no_clipboard=true /></summary>
-                            <ul role="listbox">
-                                <li><a>"Edit user"</a></li>
-                                <li><a>"Predictions"</a></li>
-                                <li><a href="/my_bets">"Bets"</a></li>
-                                <li><a href="/my_judges">"Judges"</a></li>
-                                <li><a href="/" on:click=move |_| {set_state.set(MercadoState::default())} >"Logout"</a></li>
-                            </ul>
-                        </details>
-                    }.into_view()
-                } else {
-                    view!{
-                        <a href="/login">"Login"</a>
-                    }.into_view()
-                }
-            }</li></ul>
         </nav>
     }
 }
@@ -265,7 +276,7 @@ where
 #[component]
 pub fn PredictionOverview(state: ReadSignal<MercadoState>) -> impl IntoView {
     let params = use_params_map();
-    let id = params.with(|p| p.get("id").cloned());
+    let id = params.with_untracked(|p| p.get("id").cloned());
     let id = id.unwrap_or_default().parse::<RowId>().unwrap();
     let refresh = create_rw_signal(true);
     let prediction =
