@@ -383,7 +383,7 @@ pub fn JudgeList(
                         <th>"Actions"</th>
                     </tr>
                     <For each=move || judges.clone() key=move |judge| judge.user
-                    view=move |judge: JudgePublic| view!{
+                    children=move |judge: JudgePublic| view!{
                         <JudgeListItem judge=judge state=state refresh=refresh />
                     }/>
                 </table>
@@ -524,7 +524,7 @@ pub fn BetList(
                     <th>"Payment"</th>
                 </tr>
                 <For each=move || bets.clone() key=move |judge| judge.user
-                view=move |bet: Bet| view!{
+                children=move |bet: Bet| view!{
                     <tr>
                         <td>{bet.bet}</td>
                         <td>{bet.amount.unwrap_or(0)}</td>
@@ -720,7 +720,7 @@ pub fn NewPrediction(state: ReadSignal<MercadoState>) -> impl IntoView {
             }>"Add"</a></p>
             <ul>
             <For each=move || judges.get() key=move |judge| judge.clone()
-                view=move |judge: UserPubKey| view!{
+                children=move |judge: UserPubKey| view!{
                     <li><ShortenedString string=judge.to_string() />" "
                         <a href="#" role="button" class="contrast"
                             on:click=move |_| {
@@ -837,7 +837,7 @@ pub fn AddBet(state: ReadSignal<MercadoState>) -> impl IntoView {
                         }
                     }
                     key=move |prediction| prediction.id
-                    view=move |prediction| {
+                    children=move |prediction| {
                         view! {
                             <option value={prediction.id}>{prediction.name}" ("{prediction.id}")"</option>
                         }
@@ -906,7 +906,7 @@ pub fn MyCashOuts(state: ReadSignal<MercadoState>) -> impl IntoView {
             </tr>
             <UnwrapResource resource=cash_outs view=move |cash_outs| view! {
                 <For each=move || cash_outs.clone() key=move |cash_out| cash_out.0
-                view=move |(prediction, user): (RowId, UserPubKey)| view!{
+                children=move |(prediction, user): (RowId, UserPubKey)| view!{
                     <CashOutListItem prediction=prediction user=user state=state />
                 }/>
             }.into_view() />
