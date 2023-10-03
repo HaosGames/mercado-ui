@@ -62,7 +62,6 @@ fn main() {
                             <Route path="my_judges" view=move || view!{<MyJudges state=state />} />
                             <Route path="new_prediction" view=move || view!{<NewPrediction state=state />} />
                             <Route path="add_bet" view=move || view!{<AddBet state=state />} />
-                            <Route path="cash_outs" view=move || view!{<MyCashOuts state=state />} />
                         </Routes>
                     </main>
                 </Router>

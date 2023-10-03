@@ -52,7 +52,6 @@ pub fn Navi(
                                 <li><a>"Predictions"</a></li>
                                 <li><a href="/my_bets">"Bets"</a></li>
                                 <li><a href="/my_judges">"Judges"</a></li>
-                                <li><a href="/cash_outs">"Cash Outs"</a></li>
                                 <li><a href="/" on:click=move |_| {set_state.set(MercadoState::default())} >"Logout"</a></li>
                             </ul>
                         </details>
@@ -520,24 +519,14 @@ pub fn BetList(
                     <th>"Amount"</th>
                     <Cond cond=user.is_none() view=view!{<th>"User"</th>}/>
                     <Cond cond=prediction.is_none() view=view!{<th>"Prediction"</th>}/>
-                    <th>"State"</th>
-                    <th>"Payment"</th>
                 </tr>
                 <For each=move || bets.clone() key=move |judge| judge.user
                 children=move |bet: Bet| view!{
                     <tr>
                         <td>{bet.bet}</td>
-                        <td>{bet.amount.unwrap_or(0)}</td>
+                        <td>{bet.amount}</td>
                         <Cond cond=user.is_none() view=view!{<td><Username user=Some(bet.user) /></td>}/>
                         <Cond cond=prediction.is_none() view=view!{<td><a href={format!("/prediction/{}", bet.prediction)}>"Prediction"</a></td>}/>
-                        <td>{bet.state.to_string()}
-                            {
-                                if let BetState::FundInit = bet.state {
-                                    view!{" "<a href="" ><small>"Check"</small></a>}.into_view()
-                                } else {view!{}.into_view()}
-                            }
-                        </td>
-                        <td><ShortenedString string=bet.fund_payment /></td>
                     </tr>
                 }/>
             </table>
@@ -786,7 +775,7 @@ pub fn AddBet(state: ReadSignal<MercadoState>) -> impl IntoView {
     let (search, set_search) = create_signal(String::new());
     let (prediction, set_prediction) = create_signal(String::new());
     let (bet, set_bet) = create_signal(String::new());
-    let (amount, set_amount) = create_signal(String::new());
+    let (amount, set_amount) = create_signal(String::from("100"));
     let message = create_rw_signal(None);
 
     let create_new_bet = create_action(|(request, access): &(AddBetRequest, AccessRequest)| {
@@ -802,6 +791,7 @@ pub fn AddBet(state: ReadSignal<MercadoState>) -> impl IntoView {
             prediction: prediction.get().parse().context("Choose a prediction")?,
             bet: bet.get().parse().context("Choose True or False")?,
             user: access.user,
+            amount: amount.get().parse().context("Chose a valid amount")?,
         };
         create_new_bet.dispatch((request, access));
         Ok(())
@@ -858,6 +848,10 @@ pub fn AddBet(state: ReadSignal<MercadoState>) -> impl IntoView {
                     "False"
                     </label>
                 </fieldset>
+                <label>
+                <input type="number" value=amount on:input=move |e| {set_amount.set(event_target_value(&e))} />
+                "Amount"
+                </label>
             </div>
             <label><small>
             {
@@ -887,83 +881,5 @@ pub fn AddBet(state: ReadSignal<MercadoState>) -> impl IntoView {
                 }
             } >"Add"</button></label>
         </div>
-    }
-}
-#[component]
-pub fn MyCashOuts(state: ReadSignal<MercadoState>) -> impl IntoView {
-    let cash_outs = create_local_resource(
-        move || (None, state.get().access.map(|a| a.user)),
-        move |(prediction, user)| get_cash_outs(prediction, user, state.get().access),
-    );
-
-    view! {
-        <table>
-            <tr>
-                <th>"Prediction"</th>
-                <th>"Amount"</th>
-                <th>"Payment"</th>
-                <th>"State"</th>
-            </tr>
-            <UnwrapResource resource=cash_outs view=move |cash_outs| view! {
-                <For each=move || cash_outs.clone() key=move |cash_out| cash_out.0
-                children=move |(prediction, user): (RowId, UserPubKey)| view!{
-                    <CashOutListItem prediction=prediction user=user state=state />
-                }/>
-            }.into_view() />
-        </table>
-    }
-}
-#[component]
-pub fn CashOutListItem(
-    prediction: RowId,
-    user: UserPubKey,
-    state: ReadSignal<MercadoState>,
-) -> impl IntoView {
-    let refresh = create_rw_signal(true);
-    let cash_out = create_local_resource(
-        move || refresh.get(),
-        move |_| get_cash_out(prediction, user, state.get().access.unwrap()),
-    );
-    let init_cash_out = create_action(move |invoice: &Payment| {
-        cash_out_user(
-            prediction,
-            user,
-            invoice.clone(),
-            state.get().access.unwrap(),
-        )
-    });
-    let invoice_input = create_rw_signal(generate_keypair(&mut rand::thread_rng()).1.to_string());
-
-    view! {
-    <tr>
-        <UnwrapResource resource=cash_out view=move |cash_out| view!{
-                <td><a href=format!("/prediction/{}", prediction)>"Prediction"</a></td>
-                <td>{cash_out.amount}" sats"</td>
-                {
-                    if let Some((payment, state)) = cash_out.payment {
-                        if let PaymentState::Failed = state {
-                            view! {
-                                <td><input type="text" value=invoice_input on:click=move |e| invoice_input.set(event_target_value(&e)) /></td>
-                                <td><a href="" role="button">"Retry Cash Out"</a></td>
-                            }.into_view()
-                        } else {
-                            view! {
-                                <td><ShortenedString string=payment /></td>
-                                <td>{format!("{:?}", state)}</td>
-                            }.into_view()
-                        }
-                    } else {
-                        view! {
-                            <td><input type="text" value=invoice_input on:click=move |e| invoice_input.set(event_target_value(&e)) /></td>
-                            <td><a href="" role="button" on:click=move |_| {
-                                init_cash_out.dispatch(invoice_input.get());
-                                refresh.set(!refresh.get());
-                            } >"Cash Out"</a></td>
-                        }.into_view()
-                    }
-                }
-
-
-        }.into_view() /></tr>
     }
 }

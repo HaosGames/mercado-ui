@@ -173,48 +173,6 @@ pub async fn force_decision_period(prediction: RowId, access: AccessRequest) -> 
         .await
         .map_err(map_any_err)
 }
-pub async fn get_cash_out(
-    prediction: RowId,
-    user: UserPubKey,
-    access: AccessRequest,
-) -> Result<CashOutRespose, String> {
-    client()
-        .get_cash_out(CashOutRequest { prediction, user }, access)
-        .await
-        .map_err(map_any_err)
-}
-pub async fn get_cash_outs(
-    prediction: Option<RowId>,
-    user: Option<UserPubKey>,
-    access: Option<AccessRequest>,
-) -> Result<Vec<(RowId, UserPubKey)>, String> {
-    if let Some(access) = access {
-        client()
-            .get_cash_outs(PredictionUserRequest { prediction, user }, access)
-            .await
-            .map_err(map_any_err)
-    } else {
-        Err("Not logged in".to_string())
-    }
-}
-pub async fn cash_out_user(
-    prediction: RowId,
-    user: UserPubKey,
-    payment: Payment,
-    access: AccessRequest,
-) -> Result<Sats, String> {
-    client()
-        .cash_out_user(
-            CashOutUserRequest {
-                prediction,
-                user,
-                payment,
-            },
-            access,
-        )
-        .await
-        .map_err(map_any_err)
-}
 pub async fn fetch_rw_signal<T>(signal: RwSignal<T>) -> T
 where
     T: Clone,
