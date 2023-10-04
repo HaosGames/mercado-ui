@@ -62,6 +62,18 @@ fn main() {
                             <Route path="my_judges" view=move || view!{<MyJudges state=state />} />
                             <Route path="new_prediction" view=move || view!{<NewPrediction state=state />} />
                             <Route path="add_bet" view=move || view!{<AddBet state=state />} />
+                            <Route path="wallet" view=move || view! {<Outlet/>}>
+                                <Route path=":id" view=move || view! {<Wallet state=state />}/>
+                                <Route path="" view=move || view!{<Wallet state=state/>}/>
+                            </Route>
+                            <Route path="make_deposit" view=move || view! {<Outlet/>}>
+                                <Route path=":id" view=move || view! {<MakeDeposit state=state />}/>
+                                <Route path="" view=move || view!{<MakeDeposit state=state/>}/>
+                            </Route>
+                            <Route path="make_withdrawal" view=move || view! {<Outlet/>}>
+                                <Route path=":id" view=move || view! {<MakeWithdrawal state=state />}/>
+                                <Route path="" view=move || view!{<MakeWithdrawal state=state/>}/>
+                            </Route>
                         </Routes>
                     </main>
                 </Router>

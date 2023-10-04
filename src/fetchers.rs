@@ -182,10 +182,42 @@ pub async fn get_available_balance(
         .await
         .map_err(map_any_err)
 }
+pub async fn get_balances_for_user(
+    user: UserPubKey,
+    access: AccessRequest,
+) -> Result<(Sats, Sats), String> {
+    let balance = get_balance(user, access.clone()).await?;
+    let available_balance = get_available_balance(user, access).await?;
+    Ok((available_balance, balance))
+}
 pub async fn get_balances_for(access: AccessRequest) -> Result<(Sats, Sats), String> {
     let balance = get_balance(access.clone().user, access.clone()).await?;
     let available_balance = get_available_balance(access.clone().user, access).await?;
     Ok((available_balance, balance))
+}
+pub async fn make_deposit_bolt11(
+    request: DepositRequest,
+    access: AccessRequest,
+) -> Result<(RowId, Invoice), String> {
+    client()
+        .init_deposit_bolt11(request, access)
+        .await
+        .map_err(map_any_err)
+}
+pub async fn make_withdrawal_bolt11(
+    request: WithdrawalRequest,
+    access: AccessRequest,
+) -> Result<RowId, String> {
+    client()
+        .init_withdrawal_bolt11(request, access)
+        .await
+        .map_err(map_any_err)
+}
+pub async fn get_txs(request: TxsRequest, access: AccessRequest) -> Result<Vec<RowId>, String> {
+    client().get_txs(request, access).await.map_err(map_any_err)
+}
+pub async fn get_tx(id: RowId, access: AccessRequest) -> Result<Tx, String> {
+    client().check_tx(id, access).await.map_err(map_any_err)
 }
 pub async fn force_decision_period(prediction: RowId, access: AccessRequest) -> Result<(), String> {
     client()

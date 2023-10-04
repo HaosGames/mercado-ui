@@ -35,6 +35,7 @@ pub fn Navi(
                         </ul>
                     </details>
                 </li>
+                <li><a href="#">"Users"</a></li>
             </ul>
             <ul>
                 {move || {
@@ -63,7 +64,8 @@ pub fn Navi(
                                 } no_clipboard=true /></summary>
                                 <ul role="listbox">
                                     <li><a>"Edit user"</a></li>
-                                    <li><a>"Predictions"</a></li>
+                                    <li><a href="/wallet">"Wallet"</a></li>
+                                    <li><a href="/">"Predictions"</a></li>
                                     <li><a href="/my_bets">"Bets"</a></li>
                                     <li><a href="/my_judges">"Judges"</a></li>
                                     <li><a href="/" on:click=move |_| {set_state.set(MercadoState::default())} >"Logout"</a></li>
@@ -560,10 +562,11 @@ pub fn ShortenedString(
     mut string: String,
     #[prop(optional)] no_clipboard: Option<bool>,
 ) -> impl IntoView {
+    let side_length = 8;
     let open = create_rw_signal(false);
     let original = string.clone();
-    let end = string.split_off(59);
-    string.truncate(8);
+    let end = string.split_off(string.len() - side_length);
+    string.truncate(side_length);
     string = string + "..." + end.as_str();
     view! {
         <span>
@@ -855,8 +858,8 @@ pub fn AddBet(state: ReadSignal<MercadoState>) -> impl IntoView {
                     </label>
                 </fieldset>
                 <label>
-                <input type="number" value=amount on:input=move |e| {set_amount.set(event_target_value(&e))} />
                 "Amount"
+                <input type="number" value=amount on:input=move |e| {set_amount.set(event_target_value(&e))} />
                 </label>
             </div>
             <label><small>
@@ -888,4 +891,309 @@ pub fn AddBet(state: ReadSignal<MercadoState>) -> impl IntoView {
             } >"Add"</button></label>
         </div>
     }
+}
+#[component]
+pub fn Wallet(state: ReadSignal<MercadoState>) -> impl IntoView {
+    let access = if let Some(access) = state.get_untracked().access {
+        create_rw_signal(access)
+    } else {
+        return view! {}.into_view();
+    };
+    let params = use_params_map();
+    let id = params.with_untracked(|p| p.get("id").cloned());
+    let user = id.unwrap_or_default().parse::<UserPubKey>();
+    let user = if let Ok(user) = user {
+        user
+    } else {
+        return view! {<Redirect path={format!("/wallet/{}", access.get().user.to_string())}/>}
+            .into_view();
+    };
+    let balances = create_local_resource(
+        move || (user, access.get()),
+        move |(user, a)| get_balances_for_user(user, a),
+    );
+    let deposits = create_local_resource(
+        move || (user, access.get()),
+        move |(user, a)| {
+            let request = TxsRequest {
+                user: Some(user),
+                direction: Some(TxDirection::Deposit),
+            };
+            get_txs(request, a)
+        },
+    );
+    let withdrawals = create_local_resource(
+        move || (user, access.get()),
+        move |(user, a)| {
+            let request = TxsRequest {
+                user: Some(user),
+                direction: Some(TxDirection::Withdrawal),
+            };
+            get_txs(request, a)
+        },
+    );
+
+    view! {
+        <div>
+            <h3>"Bitcoin Wallet"</h3>
+            <UnwrapResourceFor state=state resource=balances view=move |balances| view!{
+                <p>
+                    "Available Balance: "{balances.0}" sats"<br/>
+                    "Total Balance: "{balances.1}" sats"<br/>
+                </p>
+            } />
+            <div class="grid">
+                <div>
+                    <a role="button" href="/make_deposit">"Make Deposit"</a>
+                    <UnwrapResourceForUser user=user state=state resource=deposits view=move |deposits| view!{
+                        <table>
+                            <tr>
+                                <th>"Deposit"</th>
+                                <th>"State"</th>
+                            </tr>
+                            <For each=move || deposits.clone() key=|id| id.clone() children=move |id: RowId| view!{
+                                <DepositListItem state=state id=id />
+                            } />
+                        </table>
+                    } />
+                </div>
+                <div>
+                    <a role="button" href="/make_withdrawal">"Make Withdrawal"</a>
+                    <UnwrapResourceForUser user=user state=state resource=withdrawals view=move |withdrawals| view!{
+                        <table>
+                            <tr>
+                                <th>"Withdrawal"</th>
+                                <th>"Amount"</th>
+                                <th>"State"</th>
+                            </tr>
+                                <For each=move || withdrawals.clone() key=|id| id.clone() children=move |id: RowId| view!{
+                                    <WithdrawListItem state=state id=id />
+                                } />
+                        </table>
+                    } />
+                </div>
+            </div>
+        </div>
+    }
+    .into_view()
+}
+#[component]
+pub fn DepositListItem(state: ReadSignal<MercadoState>, id: RowId) -> impl IntoView {
+    let access = if let Some(access) = state.get_untracked().access {
+        create_rw_signal(access)
+    } else {
+        return view! {}.into_view();
+    };
+    let tx = create_local_resource(move || id, move |id| get_tx(id, access.get()));
+
+    view! {
+        <tr>
+            <UnwrapResourceFor state=state resource=tx view=move |tx| {
+                match tx.tx_type {
+                    TxType::Bolt11 {details, state} => {
+                        view!{
+                            <td><ShortenedString string={details.payment_request}/></td>
+                            <td>{format!("{:?}", state)}</td>
+                        }
+                    }
+                }
+            } />
+        </tr>
+    }
+    .into_view()
+}
+#[component]
+pub fn WithdrawListItem(state: ReadSignal<MercadoState>, id: RowId) -> impl IntoView {
+    let access = if let Some(access) = state.get_untracked().access {
+        create_rw_signal(access)
+    } else {
+        return view! {}.into_view();
+    };
+    let tx = create_local_resource(move || id, move |id| get_tx(id, access.get()));
+
+    view! {
+        <tr>
+            <UnwrapResourceFor state=state resource=tx view=move |tx| {
+                match tx.tx_type {
+                    TxType::Bolt11 {details, state} => {
+                        view!{
+                            <td><ShortenedString string={details.payment_request}/></td>
+                            <td>{format!("{:?}", state)}</td>
+                        }
+                    }
+                }
+            } />
+        </tr>
+    }
+    .into_view()
+}
+#[component]
+pub fn MakeDeposit(state: ReadSignal<MercadoState>) -> impl IntoView {
+    let access = if let Some(access) = state.get_untracked().access {
+        access
+    } else {
+        return view! {}.into_view();
+    };
+    let params = use_params_map();
+    let id = params.with_untracked(|p| p.get("id").cloned());
+    let user = id
+        .unwrap_or_default()
+        .parse::<UserPubKey>()
+        .unwrap_or(access.user);
+    let amount = create_rw_signal(String::from("1000"));
+    let tx_type = create_rw_signal(String::from("bolt11"));
+
+    let make_new_deposit = create_action(|(request, access): &(DepositRequest, AccessRequest)| {
+        make_deposit_bolt11(request.clone(), access.clone())
+    });
+    let add_bet = move || {
+        let access = if let Some(access) = state.get().access {
+            access
+        } else {
+            bail!("Not logged in")
+        };
+        let request = DepositRequest {
+            amount: amount.get().parse().context("Chose a valid amount")?,
+            user,
+        };
+        make_new_deposit.dispatch((request, access));
+        Ok(())
+    };
+    let created_deposit = create_local_resource(
+        move || make_new_deposit.version().get(),
+        move |_| fetch_rw_signal(make_new_deposit.value()),
+    );
+    let message = create_rw_signal(None);
+
+    view! {
+        <div>
+            <h3>"Make Deposit"</h3>
+            <div class="grid">
+                <label>"Deposit Type"
+                    <select on:input=move |e| {tx_type.set(event_target_value(&e))}>
+                        <option value="bolt11" selected >"Bolt11"</option>
+                    </select>
+                </label>
+                <label>
+                "Amount"
+                <input type="number" value=amount on:input=move |e| {amount.set(event_target_value(&e))} />
+                </label>
+            </div>
+            <p>{
+                move || {
+                    if let Some(message) = message.get() {
+                        message
+                    } else {
+                        match created_deposit.get().flatten() {
+                            Some(Ok((_id, invoice))) => {
+                                //TODO redirect to bet status page to enable paying
+                                invoice.into_view()
+                            }
+                            Some(Err(e)) => {
+                                format!("{:?}", e).into_view()
+                            }
+                            None => {
+                                view!{}.into_view()
+                            }
+                        }
+                    }
+                }
+            }</p>
+            <button on:click=move |_| {
+                match add_bet() {
+                    Ok(action) => message.set(None),
+                    Err(e) => message.set(Some(e.to_string().into_view())),
+                }
+            } >"Get Payment Details"</button>
+        </div>
+    }
+    .into_view()
+}
+#[component]
+pub fn MakeWithdrawal(state: ReadSignal<MercadoState>) -> impl IntoView {
+    let access = if let Some(access) = state.get_untracked().access {
+        access
+    } else {
+        return view! {}.into_view();
+    };
+    let params = use_params_map();
+    let id = params.with_untracked(|p| p.get("id").cloned());
+    let user = id
+        .unwrap_or_default()
+        .parse::<UserPubKey>()
+        .unwrap_or(access.user);
+    let amount = create_rw_signal(String::from("1000"));
+    let invoice = create_rw_signal(String::from(""));
+    let tx_type = create_rw_signal(String::from("bolt11"));
+
+    let make_new_withdrawal =
+        create_action(|(request, access): &(WithdrawalRequest, AccessRequest)| {
+            make_withdrawal_bolt11(request.clone(), access.clone())
+        });
+    let add_bet = move || {
+        let access = if let Some(access) = state.get().access {
+            access
+        } else {
+            bail!("Not logged in")
+        };
+        let request = WithdrawalRequest {
+            amount: amount.get().parse().context("Chose a valid amount")?,
+            invoice: invoice.get(),
+            user,
+        };
+        make_new_withdrawal.dispatch((request, access));
+        Ok(())
+    };
+    let created_withdrawal = create_local_resource(
+        move || make_new_withdrawal.version().get(),
+        move |_| fetch_rw_signal(make_new_withdrawal.value()),
+    );
+    let message = create_rw_signal(None);
+
+    view! {
+        <div>
+            <h3>"Make Withdrawal"</h3>
+            <div class="grid">
+                <label>"Withdrawal Type"
+                    <select on:input=move |e| {tx_type.set(event_target_value(&e))}>
+                        <option value="bolt11" selected >"Bolt11"</option>
+                    </select>
+                </label>
+                <label>
+                "Amount"
+                <input type="number" value=amount on:input=move |e| {amount.set(event_target_value(&e))} />
+                </label>
+            </div>
+            <label>
+            "Invoice"
+            <input type="text" value=invoice on:input=move |e| {invoice.set(event_target_value(&e))} />
+            </label>
+            <p>{
+                move || {
+                    if let Some(message) = message.get() {
+                        message
+                    } else {
+                        match created_withdrawal.get().flatten() {
+                            Some(Ok(id)) => {
+                                view!{<Redirect path={format!("/wallet")} />}.into_view()
+                            }
+                            Some(Err(e)) => {
+                                format!("{:?}", e).into_view()
+                            }
+                            None => {
+                                view!{}.into_view()
+                            }
+                        }
+                    }
+                }
+            }</p>
+            <button on:click=move |_| {
+                match add_bet() {
+                    Ok(action) => message.set(None),
+                    Err(e) => message.set(Some(e.to_string().into_view())),
+                }
+            } >"Get Payment Details"</button>
+        </div>
+    }
+    .into_view()
 }
