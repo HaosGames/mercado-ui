@@ -962,7 +962,7 @@ pub fn Wallet(state: ReadSignal<MercadoState>) -> impl IntoView {
                     <UnwrapResourceForUser user=user state=state resource=deposits view=move |deposits| view!{
                         <table>
                             <tr>
-                                <th>"Deposit"</th>
+                                <th>"Invoice"</th>
                                 <th>"State"</th>
                             </tr>
                             <For each=move || deposits.clone() key=|id| id.clone() children=move |id: RowId| view!{
@@ -976,8 +976,7 @@ pub fn Wallet(state: ReadSignal<MercadoState>) -> impl IntoView {
                     <UnwrapResourceForUser user=user state=state resource=withdrawals view=move |withdrawals| view!{
                         <table>
                             <tr>
-                                <th>"Withdrawal"</th>
-                                <th>"Amount"</th>
+                                <th>"Payment hash"</th>
                                 <th>"State"</th>
                             </tr>
                                 <For each=move || withdrawals.clone() key=|id| id.clone() children=move |id: RowId| view!{
@@ -1031,7 +1030,7 @@ pub fn WithdrawListItem(state: ReadSignal<MercadoState>, id: RowId) -> impl Into
                 match tx.tx_type {
                     TxType::Bolt11 {details, state} => {
                         view!{
-                            <td><ShortenedString string={details.payment_request}/></td>
+                            <td><ShortenedString string={details.payment_hash}/></td>
                             <td>{format!("{:?}", state)}</td>
                         }
                     }
