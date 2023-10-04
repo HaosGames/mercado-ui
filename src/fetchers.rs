@@ -158,6 +158,9 @@ pub async fn new_prediction(request: NewPredictionRequest) -> Result<RowId, Stri
 pub async fn add_bet(request: AddBetRequest, access: AccessRequest) -> Result<Payment, String> {
     client().add_bet(request, access).await.map_err(map_any_err)
 }
+pub async fn cancel_bet(id: RowId, access: AccessRequest) -> Result<(), String> {
+    client().cancel_bet(id, access).await.map_err(map_any_err)
+}
 pub async fn make_decision(
     request: MakeDecisionRequest,
     access: AccessRequest,

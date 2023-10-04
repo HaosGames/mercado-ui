@@ -509,16 +509,25 @@ pub fn BetList(
     user: Option<UserPubKey>,
     state: ReadSignal<MercadoState>,
     #[prop(optional)] collapsable: Option<bool>,
+    #[prop(optional)] refresh: Option<RwSignal<bool>>,
 ) -> impl IntoView {
     let access = if let Some(access) = state.get_untracked().access {
-        access
+        create_rw_signal(access)
     } else {
         return view! {}.into_view();
     };
+    let refresh = if let Some(refresh) = refresh {
+        refresh
+    } else {
+        create_rw_signal(true)
+    };
     let bets = create_local_resource(
-        move || PredictionUserRequest { prediction, user },
-        move |request| get_bets(request, access.clone()),
+        move || (PredictionUserRequest { prediction, user }, refresh.get()),
+        move |(request, _)| get_bets(request, access.get()),
     );
+    let cancel_bet = create_action(|(id, access): &(RowId, AccessRequest)| {
+        cancel_bet(id.clone(), access.clone())
+    });
     let table = move |bets: Vec<Bet>| {
         view! {
             <table>
@@ -527,14 +536,19 @@ pub fn BetList(
                     <th>"Amount"</th>
                     <Cond cond=user.is_none() view=view!{<th>"User"</th>}/>
                     <Cond cond=prediction.is_none() view=view!{<th>"Prediction"</th>}/>
+                    <th>"Actions"</th>
                 </tr>
-                <For each=move || bets.clone() key=move |judge| judge.user
+                <For each=move || bets.clone() key=move |bet| bet.user
                 children=move |bet: Bet| view!{
                     <tr>
                         <td>{bet.bet}</td>
                         <td>{bet.amount}</td>
                         <Cond cond=user.is_none() view=view!{<td><Username user=Some(bet.user) /></td>}/>
                         <Cond cond=prediction.is_none() view=view!{<td><a href={format!("/prediction/{}", bet.prediction)}>"Prediction"</a></td>}/>
+                        <td><a role="button" href="#" on:click=move |_| {
+                            cancel_bet.dispatch((bet.id, access.get()));
+                            refresh.set(!refresh.get());
+                        }>"Cancel"</a></td>
                     </tr>
                 }/>
             </table>
@@ -625,7 +639,7 @@ pub fn Username(
 }
 #[component]
 pub fn MyBets(state: ReadSignal<MercadoState>) -> impl IntoView {
-    let user = if let Some(user) = state.get().user {
+    let user = if let Some(user) = state.get_untracked().user {
         if let UserRole::User = user.role {
             Some(user.user)
         } else {
