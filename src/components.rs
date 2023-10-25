@@ -1205,7 +1205,7 @@ pub fn MakeWithdrawal(state: ReadSignal<MercadoState>) -> impl IntoView {
                     Ok(action) => message.set(None),
                     Err(e) => message.set(Some(e.to_string().into_view())),
                 }
-            } >"Get Payment Details"</button>
+            } >"Withdraw"</button>
         </div>
     }
     .into_view()
