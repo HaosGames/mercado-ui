@@ -73,7 +73,6 @@ pub fn Navi(
                             </details>
                         }.into_view()
                     } else {
-                        set_state.set(MercadoState{access: None, user: None});
                         view!{
                             <a href="/login">"Login"</a>
                         }.into_view()
