@@ -854,17 +854,6 @@ pub fn AddBet(state: ReadSignal<MercadoState>) -> impl IntoView {
                 }
 
             } /></Box>
-            // <fieldset>
-            //     <legend>"Bet"</legend>
-            //     <label>
-            //     <input type="radio" value="true" name="bet" on:input=move |e| {set_bet.set(event_target_value(&e))} />
-            //     " True "
-            //     </label>
-            //     <label>
-            //     <input type="radio" value="false" name="bet" on:input=move |e| {set_bet.set(event_target_value(&e))} />
-            //     " False "
-            //     </label>
-            // </fieldset>
             <div>
                 <Toggle state=bet set_state=set_bet icons=ToggleIcons {
                     on: leptos_icons::BsIcon::BsCheck.into(),
@@ -1053,7 +1042,7 @@ pub fn MakeDeposit(state: ReadSignal<MercadoState>) -> impl IntoView {
         .unwrap_or_default()
         .parse::<UserPubKey>()
         .unwrap_or(access.user);
-    let amount = create_rw_signal(String::from("1000"));
+    let amount = create_rw_signal(1000.0);
     let tx_type = create_rw_signal(String::from("bolt11"));
 
     let make_new_deposit = create_action(|(request, access): &(DepositRequest, AccessRequest)| {
@@ -1066,7 +1055,7 @@ pub fn MakeDeposit(state: ReadSignal<MercadoState>) -> impl IntoView {
             bail!("Not logged in")
         };
         let request = DepositRequest {
-            amount: amount.get().parse().context("Chose a valid amount")?,
+            amount: amount.get() as Sats,
             user,
         };
         make_new_deposit.dispatch((request, access));
@@ -1079,18 +1068,11 @@ pub fn MakeDeposit(state: ReadSignal<MercadoState>) -> impl IntoView {
     let message = create_rw_signal(None);
 
     view! {
-        <div>
+        <Stack spacing=Size::Em(1.0)>
             <h3>"Make Deposit"</h3>
-            <div class="grid">
-                <label>"Deposit Type"
-                    <select on:input=move |e| {tx_type.set(event_target_value(&e))}>
-                        <option value="bolt11" selected >"Bolt11"</option>
-                    </select>
-                </label>
-                <label>
-                "Amount"
-                <input type="number" value=amount on:input=move |e| {amount.set(event_target_value(&e))} />
-                </label>
+            <div>
+                <NumberInput get=amount set=amount.write_only() step=1000.0 />
+                <label>"Amount"</label>
             </div>
             <p>{
                 move || {
@@ -1112,13 +1094,13 @@ pub fn MakeDeposit(state: ReadSignal<MercadoState>) -> impl IntoView {
                     }
                 }
             }</p>
-            <button on:click=move |_| {
+            <Button on_click=move |_| {
                 match add_bet() {
                     Ok(action) => message.set(None),
                     Err(e) => message.set(Some(e.to_string().into_view())),
                 }
-            } >"Get Payment Details"</button>
-        </div>
+            } >"Get Payment Details"</Button>
+        </Stack>
     }
     .into_view()
 }
@@ -1135,7 +1117,7 @@ pub fn MakeWithdrawal(state: ReadSignal<MercadoState>) -> impl IntoView {
         .unwrap_or_default()
         .parse::<UserPubKey>()
         .unwrap_or(access.user);
-    let amount = create_rw_signal(String::from("1000"));
+    let amount = create_rw_signal(1000.0);
     let invoice = create_rw_signal(String::from(""));
     let tx_type = create_rw_signal(String::from("bolt11"));
 
@@ -1150,7 +1132,7 @@ pub fn MakeWithdrawal(state: ReadSignal<MercadoState>) -> impl IntoView {
             bail!("Not logged in")
         };
         let request = WithdrawalRequest {
-            amount: amount.get().parse().context("Chose a valid amount")?,
+            amount: amount.get() as Sats,
             invoice: invoice.get(),
             user,
         };
@@ -1164,23 +1146,13 @@ pub fn MakeWithdrawal(state: ReadSignal<MercadoState>) -> impl IntoView {
     let message = create_rw_signal(None);
 
     view! {
-        <div>
+        <Stack spacing=Size::Em(1.0)>
             <h3>"Make Withdrawal"</h3>
-            <div class="grid">
-                <label>"Withdrawal Type"
-                    <select on:input=move |e| {tx_type.set(event_target_value(&e))}>
-                        <option value="bolt11" selected >"Bolt11"</option>
-                    </select>
-                </label>
-                <label>
-                "Amount"
-                <input type="number" value=amount on:input=move |e| {amount.set(event_target_value(&e))} />
-                </label>
+            <div>
+                <NumberInput get=amount set=amount.write_only() step=1000.0 />
+                <label>"Amount (sats)"</label>
             </div>
-            <label>
-            "Invoice"
-            <input type="text" value=invoice on:input=move |e| {invoice.set(event_target_value(&e))} />
-            </label>
+            <TextInput get=invoice set=invoice.write_only() placeholder="Invoice" />
             <p>{
                 move || {
                     if let Some(message) = message.get() {
@@ -1200,13 +1172,13 @@ pub fn MakeWithdrawal(state: ReadSignal<MercadoState>) -> impl IntoView {
                     }
                 }
             }</p>
-            <button on:click=move |_| {
+            <Button on_click=move |_| {
                 match add_bet() {
                     Ok(action) => message.set(None),
                     Err(e) => message.set(Some(e.to_string().into_view())),
                 }
-            } >"Withdraw"</button>
-        </div>
+            } >"Withdraw"</Button>
+        </Stack>
     }
     .into_view()
 }
