@@ -308,12 +308,12 @@ pub fn PredictionOverview(state: ReadSignal<MercadoState>) -> impl IntoView {
                     if prediction.state == MarketState::Trading
                         && (user.role == UserRole::Root || user.role == UserRole::Admin)
                     { view!{
-                            <span style="float:right"><a href="" role="button"
-                                on:click=move |_| {
+                            <span style="float:right"><Button
+                                on_click=move |_| {
                                     force_decision_period.dispatch(());
                                     refresh.set(!refresh.get());
                                 }
-                            >"Force decision period"</a></span>
+                            >"Force decision period"</Button></span>
                         }.into_view()
                     } else {view!{}.into_view()}
                 } else {view!{}.into_view()}
@@ -349,6 +349,7 @@ pub fn PredictionOverview(state: ReadSignal<MercadoState>) -> impl IntoView {
                 <Button on_click=move |_| {
                     refresh.set(!refresh.get());
                 }>"Refresh"</Button>
+                <LinkButton href={move || format!("/add_bet?prediction={}", prediction.id)} >"Add bet"</LinkButton>
             </p>
             <JudgeList prediction=Some(prediction.id) user=user state=state refresh=refresh collapsable=true/>
             <BetList prediction=Some(prediction.id) state=state collapsable=true
@@ -800,9 +801,24 @@ pub fn NewPrediction(state: ReadSignal<MercadoState>) -> impl IntoView {
 }
 #[component]
 pub fn AddBet(state: ReadSignal<MercadoState>) -> impl IntoView {
+    let query = use_query_map();
+    let pred_id = move || query.with(|query| query.get("prediction").cloned());
+
     let predictions = create_local_resource(move || {}, get_predictions);
     let (search, set_search) = create_signal(String::new());
-    let (prediction, set_prediction) = create_signal::<Option<PredictionOverviewResponse>>(None);
+    let (prediction, set_prediction) = if let Some(pred) = pred_id() {
+        create_signal(Some(PredictionOverviewResponse {
+            id: pred.parse().unwrap(),
+            name: "".to_string(),
+            state: MarketState::Trading,
+            judge_share_ppm: 10000,
+            judge_count: 3,
+            trading_end: Utc::now(),
+            decision_period_sec: 86400,
+        }))
+    } else {
+        create_signal::<Option<PredictionOverviewResponse>>(None)
+    };
     let (bet, set_bet) = create_signal(false);
     let (amount, set_amount) = create_signal(100.0);
     let message = create_rw_signal(None);
@@ -874,7 +890,7 @@ pub fn AddBet(state: ReadSignal<MercadoState>) -> impl IntoView {
                         match created_bet.get().flatten() {
                             Some(Ok(payment)) => {
                                 //TODO redirect to bet status page to enable paying
-                                view!{<Redirect path={format!("/")} />}.into_view()
+                                view!{<Redirect path={format!("/prediction/{}", prediction.get().unwrap().id)} />}.into_view()
                             }
                             Some(Err(e)) => {
                                 format!("{:?}", e).into_view()
