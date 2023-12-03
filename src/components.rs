@@ -3,6 +3,7 @@ use crate::{fetchers::*, MercadoState};
 use anyhow::{bail, Context};
 use chrono::DateTime;
 use chrono::{offset::Utc, Duration};
+use leptonic::prelude::*;
 use leptos::{html::Input, *};
 use leptos_router::*;
 use mercado::{
@@ -23,21 +24,19 @@ pub fn Navi(
 ) -> impl IntoView {
     let check_login = create_local_resource(move || state.get().access, check_login);
     view! {
-        <nav class="container">
-            <ul>
-                <li><a href="/"><strong>"Mercado"</strong></a></li>
-                <li>
-                    <details role="list" >
-                        <summary aria-haspopup="listbox" role="link" >"New"</summary>
-                        <ul role="listbox">
-                            <li><A href="/new_prediction">"Prediction"</A></li>
-                            <li><A href="/add_bet">"Bet"</A></li>
-                        </ul>
-                    </details>
-                </li>
-                <li><a href="#">"Users"</a></li>
-            </ul>
-            <ul>
+        <AppBar>
+            <Stack orientation=StackOrientation::Horizontal spacing=Size::Em(1.0) style="padding-left: 20px">
+                <Link href="/"><H2>"Mercado"</H2></Link>
+                <ButtonGroup>
+                    <LinkButton href="/new_prediction">"New Prediction"</LinkButton>
+                    <LinkButton href="/add_bet">"New Bet"</LinkButton>
+                </ButtonGroup>
+            </Stack>
+            <Stack orientation=StackOrientation::Horizontal spacing=Size::Em(1.0) style="padding-right: 20px">
+                <Link href="/">"Predictions"</Link>
+                <Link href="/my_bets">"Bets"</Link>
+                <Link href="/my_judges">"Judges"</Link>
+                <Link href="#">"Users"</Link>
                 {move || {
                     let access = if let Some(access) = state.get().access {
                         access
@@ -47,39 +46,31 @@ pub fn Navi(
                     let balances = create_local_resource(move || {}, move |_| get_balances_for(access.clone()));
                     view!{
                         <UnwrapResourceFor state=state resource=balances view=move |balances| { view! {
-                            <li>{balances.0}"/"{balances.1}" sats"</li>
+                            <Link href="/wallet">{balances.0}"/"{balances.1}" sats"</Link>
                         }} />
                     }.into_view()
                 }}
-                <li>{
+                {
                     move || if state.get().access.is_some() && check_login.get().transpose().ok().flatten().is_some() {
                         view!{
-                            <details role="list" >
-                                <summary aria-haspopup="listbox" role="link" ><Username user={
-                                    if let Some(access) = state.get().access {
-                                        Some(access.user)
-                                    } else {
-                                        None
-                                    }
-                                } no_clipboard=true /></summary>
-                                <ul role="listbox">
-                                    <li><a>"Edit user"</a></li>
-                                    <li><a href="/wallet">"Wallet"</a></li>
-                                    <li><a href="/">"Predictions"</a></li>
-                                    <li><a href="/my_bets">"Bets"</a></li>
-                                    <li><a href="/my_judges">"Judges"</a></li>
-                                    <li><a href="/" on:click=move |_| {set_state.set(MercadoState::default())} >"Logout"</a></li>
-                                </ul>
-                            </details>
+                            <Username user={
+                                if let Some(access) = state.get().access {
+                                    Some(access.user)
+                                } else {
+                                    None
+                                }
+                            } no_clipboard=true />
+                            <LinkButton href="/" on:click=move |_| {set_state.set(MercadoState::default())} >"Logout"</LinkButton>
                         }.into_view()
                     } else {
                         view!{
-                            <a href="/login">"Login"</a>
+                            <LinkButton href="/login">"Login"</LinkButton>
                         }.into_view()
                     }
-                }</li>
-            </ul>
-        </nav>
+                }
+            <ThemeToggle off=LeptonicTheme::Light on=LeptonicTheme::Dark/>
+            </Stack>
+        </AppBar>
     }
 }
 #[component]
@@ -147,23 +138,30 @@ pub fn PredictionListItem(
         },
     );
     view! {
-        <tr>
-            <td><a href={format!("/prediction/{}", prediction.id)}>{prediction.name}</a></td>
-            <td>{prediction.trading_end.to_string()}</td>
-            <td>{prediction.judge_share_ppm / 10000}"%"</td>
-            <td>{prediction.state.to_string()}</td>
-            <td><UnwrapResource resource=ratio view=move |ratio| view! {
-                    <span>{format!("True: {}% ({} sats)",
-                         ratio.0 as f32/(ratio.0+ratio.1)as f32*100.0,
-                         ratio.0,
-                    )}</span>
-                    <span style="float:right">{format!("False: {}% ({} sats)",
-                         ratio.1 as f32/(ratio.0+ratio.1)as f32*100.0,
-                         ratio.1,
-                    )}</span><br/>
-                    <progress value={ratio.0} max={ratio.0+ratio.1}>"Ratio"</progress>
-                } /></td>
-        </tr>
+        <Grid spacing=Size::Em(0.6)>
+            <Row>
+                <Col><Link href={format!("/prediction/{}", prediction.id)}>{prediction.name}</Link></Col>
+            </Row>
+            <Row>
+                <Col xs=1>{prediction.trading_end.to_string()}</Col>
+                <Col xs=1>{prediction.judge_share_ppm / 10000}"%"</Col>
+                <Col xs=1>{prediction.state.to_string()}</Col>
+                <Col xs=1><UnwrapResource resource=ratio view=move |ratio| view! {
+                    <Stack spacing=Size::Zero style="width:100%">
+                        <Stack orientation=StackOrientation::Horizontal spacing=Size::Px(8)>
+                        <span>{format!("True: {}% ({} sats)",
+                             ratio.0 as f32/(ratio.0+ratio.1)as f32*100.0,
+                             ratio.0,
+                        )}</span>
+                        <span style="float:right">{format!("False: {}% ({} sats)",
+                             ratio.1 as f32/(ratio.0+ratio.1)as f32*100.0,
+                             ratio.1,
+                        )}</span></Stack>
+                        <ProgressBar progress=Some(ratio.0 as f64) max={(ratio.0+ratio.1) as f64} />
+                    </Stack>
+                } /></Col>
+            </Row>
+        </Grid>
     }
 }
 #[component]
@@ -175,24 +173,23 @@ pub fn PredictionList() -> impl IntoView {
         <UnwrapResource resource=predictions view=move |mut predictions| view! {
             <p>{predictions.len()}" prediction(s)"
                 <span style="float:right">
-                    <a href="" role="button" on:click=move |_| refresh.set(!refresh.get())>"Refresh"</a>
+                    <Button on_click=move |_| refresh.set(!refresh.get())>"Refresh"</Button>
                 </span>
             </p>
-            <table role="grid">
-                <tr>
-                   <th>"Prediction"</th>
-                   <th>"End"</th>
-                   <th>"Judge Share"</th>
-                   <th>"State"</th>
-                   <th>"Ratio"</th>
-                </tr>
+            <Grid spacing=Size::Em(0.6)><Row>
+                <Col xs=1><H3>"Trading End"</H3></Col>
+                <Col xs=1><H3>"Judge Share"</H3></Col>
+                <Col xs=1><H3>"State"</H3></Col>
+                <Col xs=1><H3>"Capital"</H3></Col>
+            </Row></Grid>
+            <Stack spacing=Size::Em(1.0)>
                 {
                     predictions.sort_by(|a, b| a.id.cmp(&b.id));
                     predictions.into_iter()
                     .map(|prediction| view! {<PredictionListItem prediction=prediction refresh=refresh/>})
                     .collect::<Vec<_>>()
                 }
-            </table>
+            </Stack>
         } />
     }
 }
@@ -346,14 +343,14 @@ pub fn PredictionOverview(state: ReadSignal<MercadoState>) -> impl IntoView {
                          ratio.1 as f32/(ratio.0+ratio.1)as f32*100.0,
                          ratio.1,
                     )}</span><br/>
-                    <progress value={ratio.0} max={ratio.0+ratio.1}>"Ratio"</progress><br/>
+                    <ProgressBar progress={Some(ratio.0 as f64)} max={(ratio.0+ratio.1) as f64}/>
                     <p style="text-align:center">"Total: "{ratio.0+ratio.1}" sats"</p>
                 } />
-                <a href="" role="button" on:click=move |_| {
+                <Button on_click=move |_| {
                     refresh.set(!refresh.get());
-                }>"Refresh"</a>
+                }>"Refresh"</Button>
             </p>
-            <JudgeList prediction=Some(prediction.id) user=user state=state refresh=refresh />
+            <JudgeList prediction=Some(prediction.id) user=user state=state refresh=refresh collapsable=true/>
             <BetList prediction=Some(prediction.id) state=state collapsable=true
                 user=user
             />
@@ -367,6 +364,7 @@ pub fn JudgeList(
     user: Option<UserPubKey>,
     state: ReadSignal<MercadoState>,
     #[prop(optional)] refresh: Option<RwSignal<bool>>,
+    #[prop(optional)] collapsable: Option<bool>,
 ) -> impl IntoView {
     let refresh = if let Some(refresh) = refresh {
         refresh
@@ -377,25 +375,38 @@ pub fn JudgeList(
         move || prediction.clone(),
         move |prediction| get_judges(prediction, user),
     );
-    view! {
-        <UnwrapResource
-            resource=judges
-            view=move |judges| view! {
-            <details open>
-                <summary>{format!("Judges: {}", judges.len())}</summary>
-                <table>
-                    <tr>
-                        <th>"Judge"</th>
-                        <th>"State"</th>
-                        <th>"Actions"</th>
-                    </tr>
-                    <For each=move || judges.clone() key=move |judge| judge.user
-                    children=move |judge: JudgePublic| view!{
-                        <JudgeListItem judge=judge state=state refresh=refresh />
-                    }/>
-                </table>
-            </details>
-        } />
+    let table = move |judges: Vec<JudgePublic>| {
+        view! {
+            <TableContainer><Table bordered=true hoverable=true>
+                <Thead><Tr>
+                    <Th>"Judge"</Th>
+                    <Th>"State"</Th>
+                    <Th>"Actions"</Th>
+                </Tr></Thead>
+                <Tbody><For each=move || judges.clone() key=move |judge| judge.user
+                children=move |judge: JudgePublic| view!{
+                    <JudgeListItem judge=judge state=state refresh=refresh />
+                }/></Tbody>
+            </Table></TableContainer>
+        }
+    };
+    if let Some(true) = collapsable {
+        view! {
+            <UnwrapResourceFor state=state resource=judges view=move |judges| {
+                let judgec = judges.clone();
+                view!{
+                <Collapsible>
+                    <CollapsibleHeader slot>{format!("Judges: {}", judgec.len())}</CollapsibleHeader>
+                    <CollapsibleBody slot>{table(judges)}</CollapsibleBody>
+                </Collapsible>
+            }} />
+        }
+    } else {
+        view! {
+            <UnwrapResourceFor state=state resource=judges view=move |judges| view!{
+                {table(judges)}
+            } />
+        }
     }
 }
 #[component]
@@ -434,15 +445,15 @@ pub fn JudgeListItem(
         move |_| get_judge(judge.prediction, judge.user, state),
     );
     view! {
-        <tr>
-            <td><Username user= Some(judge.user) /></td>
-            <td><UnwrapResourceForUser
+        <Tr>
+            <Td><Username user= Some(judge.user) /></Td>
+            <Td><UnwrapResourceForUser
                 user=judge.user
                 state=state
                 resource=judge_priv
                 view=move |judge| judge.state.to_string()
-            /></td>
-            <td><UnwrapResourceForUser
+            /></Td>
+            <Td><UnwrapResourceForUser
             user=judge.user
             state=state
             resource=judge_priv
@@ -450,46 +461,46 @@ pub fn JudgeListItem(
                 match prediction.get().transpose().ok().flatten().map(|prediction| prediction.state).unwrap_or(MarketState::Trading) {
                     MarketState::WaitingForJudges => {
                         view! {
-                            <a href="" role="button" class="outline" on:click=move |_| {
+                            <Button on_click=move |_| {
                                 accept.dispatch(PostRequest {
                                     data: NominationRequest {user: judge.user, prediction: judge.prediction},
                                     access: state.get().access.unwrap()});
                                 refresh.set(!refresh.get());
                             }>
                                 "Accept"
-                            </a>
-                            <a href="" role="button" class="outline contrast" on:click=move |_| {
+                            </Button>
+                            <Button on_click=move |_| {
                                 refuse.dispatch(PostRequest {
                                     data: NominationRequest {user: judge.user, prediction: judge.prediction},
                                     access: state.get().access.unwrap()});
                                 refresh.set(!refresh.get());
                             }>
                                 "Refuse"
-                            </a>
+                            </Button>
                         }.into_view()
                     }
                     MarketState::WaitingForDecision => {
                         view! {
-                            <a href="" role="button" class="outline" on:click=move |_| {
+                            <Button on_click=move |_| {
                                 decide.dispatch((judge, true));
                                 refresh.set(!refresh.get());
                             }>
                                 "Decide True"
-                            </a>
-                            <a href="" role="button" class="outline contrast" on:click=move |_| {
+                            </Button>
+                            <Button on_click=move |_| {
                                 decide.dispatch((judge, false));
                                 refresh.set(!refresh.get());
                             }>
                                 "Decide False"
-                            </a>
+                            </Button>
 
                         }.into_view()
                     }
                     _ => {view!{}.into_view()}
                 }
                 } />
-            </td>
-        </tr>
+            </Td>
+        </Tr>
     }
 }
 #[component]
@@ -530,38 +541,40 @@ pub fn BetList(
     });
     let table = move |bets: Vec<Bet>| {
         view! {
-            <table>
-                <tr>
-                    <th>"Bet"</th>
-                    <th>"Amount"</th>
-                    <Cond cond=user.is_none() view=view!{<th>"User"</th>}/>
-                    <Cond cond=prediction.is_none() view=view!{<th>"Prediction"</th>}/>
-                    <th>"Actions"</th>
-                </tr>
-                <For each=move || bets.clone() key=move |bet| bet.user
+            <TableContainer><Table bordered=true hoverable=true>
+                <Thead><Tr>
+                    <Th>"Bet"</Th>
+                    <Th>"Amount"</Th>
+                    <Cond cond=user.is_none() view=view!{<Th>"User"</Th>}/>
+                    <Cond cond=prediction.is_none() view=view!{<Th>"Prediction"</Th>}/>
+                    <Th>"Actions"</Th>
+                </Tr></Thead>
+                <Tbody><For each=move || bets.clone() key=move |bet| bet.user
                 children=move |bet: Bet| view!{
-                    <tr>
-                        <td>{bet.bet}</td>
-                        <td>{bet.amount}</td>
-                        <Cond cond=user.is_none() view=view!{<td><Username user=Some(bet.user) /></td>}/>
-                        <Cond cond=prediction.is_none() view=view!{<td><a href={format!("/prediction/{}", bet.prediction)}>"Prediction"</a></td>}/>
-                        <td><a role="button" href="#" on:click=move |_| {
+                    <Tr>
+                        <Td>{bet.bet}</Td>
+                        <Td>{bet.amount}</Td>
+                        <Cond cond=user.is_none() view=view!{<Td><Username user=Some(bet.user) /></Td>}/>
+                        <Cond cond=prediction.is_none() view=view!{<Td><Link href={format!("/prediction/{}", bet.prediction)}>"Prediction"</Link></Td>}/>
+                        <Td><Button on_click=move |_| {
                             cancel_bet.dispatch((bet.id, access.get()));
                             refresh.set(!refresh.get());
-                        }>"Cancel"</a></td>
-                    </tr>
-                }/>
-            </table>
+                        }>"Cancel"</Button></Td>
+                    </Tr>
+                }/></Tbody>
+            </Table></TableContainer>
         }
     };
     if let Some(true) = collapsable {
         view! {
-            <UnwrapResourceFor state=state resource=bets view=move |bets| view!{
-                <details>
-                    <summary>{format!("Bets: {}", bets.len())}</summary>
-                    {table(bets)}
-                </details>
-            } />
+            <UnwrapResourceFor state=state resource=bets view=move |bets| {
+                let betc = bets.clone();
+                view!{
+                <Collapsible>
+                    <CollapsibleHeader slot>{format!("Bets: {}", betc.len())}</CollapsibleHeader>
+                    <CollapsibleBody slot>{table(bets)}</CollapsibleBody>
+                </Collapsible>
+            }} />
         }
     } else {
         view! {
@@ -595,15 +608,12 @@ pub fn ShortenedString(
                         // }
                         open.set(true);
                     }>"📋 "</a>
-                    <dialog open=open>
-                        <article>
-                            <header>
-                                <a href="" class="close" aria-label="Close" on:click=move |_| open.set(false)></a>
-                                "Copy"
-                            </header>
-                            <p>{original}</p>
-                        </article>
-                    </dialog>
+                    <Modal show_when=open>
+                        <ModalHeader>"Copy"</ModalHeader>
+                        <ModalTitle>""</ModalTitle>
+                        <ModalBody><p><small>{original}</small></p></ModalBody>
+                        <ModalFooter><Button on_click=move |_| open.set(false)>"Close"</Button></ModalFooter>
+                    </Modal>
                 }.into_view()
             } else {view!{}.into_view()}
             }
@@ -672,21 +682,13 @@ pub fn MyJudges(state: ReadSignal<MercadoState>) -> impl IntoView {
 #[component]
 pub fn NewPrediction(state: ReadSignal<MercadoState>) -> impl IntoView {
     let (prediction, set_prediction) = create_signal(String::from("This works"));
-    let (end, set_end) = create_signal(String::from(
-        (Utc::now() + Duration::days(5)).to_rfc3339().split_at(16).0,
-    ));
-    let (judge_count, set_judge_count) = create_signal("3".to_string());
+    let (end, set_end) = create_signal(time::OffsetDateTime::now_utc());
+    let (judge_count, set_judge_count) = create_signal(3.0);
     let (judges, set_judges) = create_signal::<Vec<UserPubKey>>(vec![]);
     let (new_judge, set_new_judge) =
         create_signal(generate_keypair(&mut rand::thread_rng()).1.to_string());
-    let (decision, set_decision) = create_signal("3".to_string());
-    let (judge_share, set_judge_share) = create_signal("10000".to_string());
-
-    let parsed_end = move || (end.get() + ":00Z").parse::<DateTime<Utc>>();
-    let display_end = move || match parsed_end() {
-        Ok(parsed) => parsed.to_string().into_view(),
-        Err(_e) => "".into_view(),
-    };
+    let (decision, set_decision) = create_signal(3.0);
+    let (judge_share, set_judge_share) = create_signal(10000.0);
 
     let new_prediction_action =
         create_action(|request: &NewPredictionRequest| new_prediction(request.clone()));
@@ -697,30 +699,34 @@ pub fn NewPrediction(state: ReadSignal<MercadoState>) -> impl IntoView {
     );
 
     view! {
-        <div>
-            <h3>"Create a new prediction"</h3>
-            <label>"Prediction"</label>
-            <input type="text"
-                on:input=move |e| {
-                    set_prediction.set(event_target_value(&e));
-                }
-                value={prediction}
-            />
-            <div class="grid">
-                <label>"Ends at "{display_end}
-                <input type="datetime-local" on:input=move |e| { set_end.set(event_target_value(&e)); } value={end}/></label>
-                <label>"Days of decision period for judges"
-                <input type="number" on:input=move |e| { set_decision.set(event_target_value(&e))} value={decision} /></label>
-            </div>
-            <div class="grid">
-                <label>"Portion for Judges (ppm)"
-                <input type="number" on:input=move |e| { set_judge_share.set(event_target_value(&e))} value={judge_share} /></label>
-                <label>"How many judges need to participate?"
-                <input type="number" on:input=move |e| { set_judge_count.set(event_target_value(&e)) } value={judge_count}/></label>
-            </div>
-            <p>"Judges: "
-                <input type="text" on:input=move |e| {set_new_judge.set(event_target_value(&e)) } value={new_judge}/>
-            <a href="#" role="button" on:click=move |_| {
+        <Stack spacing=Size::Em(1.0)>
+            <H3>"Create a new prediction"</H3>
+            <Box style="width: 50%"><TextInput get=prediction set=set_prediction placeholder="Prediction" /></Box>
+            <Stack orientation=StackOrientation::Horizontal spacing=Size::Em(2.0) >
+                <div>
+                    <DateSelector value=time::OffsetDateTime::now_utc() on_change=move |date: time::OffsetDateTime| {
+                        set_end.set(date)
+                    } />
+                    <label>"Ends at "{move || format!("{}", end.get())}</label>
+                </div>
+                <div>
+                    <div>
+                        <NumberInput get=decision set=set_decision step=1.0 />
+                        <label>"Decision duration"</label>
+                    </div>
+                    <div>
+                        <NumberInput get=judge_share set=set_judge_share step=1000.0 />
+                        <label>"Portion for Judges (ppm)"</label>
+                    </div>
+                    <div>
+                        <NumberInput get=judge_count set=set_judge_count step=1.0 />
+                        <label>"How many judges need to participate?"</label>
+                    </div>
+                </div>
+            </Stack>
+            <Box style="width: 50%">"Judges: "
+                <TextInput get=new_judge set=set_new_judge placeholder="Judge Public Key" />
+            <Button on_click=move |_| {
                 if let Ok(judge) = new_judge.get().parse() {
                     let mut judges = judges.get();
                     judges.push(judge);
@@ -729,20 +735,20 @@ pub fn NewPrediction(state: ReadSignal<MercadoState>) -> impl IntoView {
                 } else {
                     return
                 }
-            }>"Add"</a></p>
+            }>"Add"</Button></Box>
             <ul>
             <For each=move || judges.get() key=move |judge| judge.clone()
                 children=move |judge: UserPubKey| view!{
                     <li><ShortenedString string=judge.to_string() />" "
-                        <a href="#" role="button" class="contrast"
-                            on:click=move |_| {
+                        <Button
+                            on_click=move |_| {
                                 let mut judges = judges.get();
                                 judges.retain(|judge_item| {
                                     judge_item != &judge
                                 });
                                 set_judges.set(judges);
                             }
-                        >"Remove"</a>
+                        >"Remove"</Button>
                     </li>
                 } />
             </ul>
@@ -765,15 +771,15 @@ pub fn NewPrediction(state: ReadSignal<MercadoState>) -> impl IntoView {
                     }
                 }
             }
-            <button on:click=move |_| {
+            <Button on_click=move |_| {
                 let result = move || {
                     let request = NewPredictionRequest {
-                        decision_period_sec: decision.get().parse::<u32>().context("Decision period needs to be a number")? * 86400,
-                        judge_count: judge_count.get().parse().context("Judge count needs to be a number")?,
-                        judge_share_ppm: judge_share.get().parse().context("Judge share needs to be a number")?,
+                        decision_period_sec: decision.get() as u32 * 86400,
+                        judge_count: judge_count.get() as u32,
+                        judge_share_ppm: judge_share.get() as u32,
                         judges: judges.get(),
                         prediction: prediction.get(),
-                        trading_end: parsed_end().context("Trading end needs to be in a valid format")?
+                        trading_end: DateTime::from_timestamp(end.get().unix_timestamp(),0).unwrap(),
                     };
                     new_prediction_action.dispatch(request);
                     Ok::<(),anyhow::Error>(())
@@ -788,17 +794,17 @@ pub fn NewPrediction(state: ReadSignal<MercadoState>) -> impl IntoView {
                         }.into_view()));
                     }
                 }
-            } >"Create"</button>
-        </div>
+            } >"Create"</Button>
+        </Stack>
     }
 }
 #[component]
 pub fn AddBet(state: ReadSignal<MercadoState>) -> impl IntoView {
     let predictions = create_local_resource(move || {}, get_predictions);
     let (search, set_search) = create_signal(String::new());
-    let (prediction, set_prediction) = create_signal(String::new());
-    let (bet, set_bet) = create_signal(String::new());
-    let (amount, set_amount) = create_signal(String::from("100"));
+    let (prediction, set_prediction) = create_signal::<Option<PredictionOverviewResponse>>(None);
+    let (bet, set_bet) = create_signal(false);
+    let (amount, set_amount) = create_signal(100.0);
     let message = create_rw_signal(None);
 
     let create_new_bet = create_action(|(request, access): &(AddBetRequest, AccessRequest)| {
@@ -811,10 +817,10 @@ pub fn AddBet(state: ReadSignal<MercadoState>) -> impl IntoView {
             bail!("Not logged in")
         };
         let request = AddBetRequest {
-            prediction: prediction.get().parse().context("Choose a prediction")?,
-            bet: bet.get().parse().context("Choose True or False")?,
+            prediction: prediction.get().unwrap().id,
+            bet: bet.get(),
             user: access.user,
-            amount: amount.get().parse().context("Chose a valid amount")?,
+            amount: amount.get() as Sats,
         };
         create_new_bet.dispatch((request, access));
         Ok(())
@@ -824,57 +830,51 @@ pub fn AddBet(state: ReadSignal<MercadoState>) -> impl IntoView {
         move |_| fetch_rw_signal(create_new_bet.value()),
     );
     view! {
-        <div>
+        <Stack spacing=Size::Em(1.0)>
             <h3>"New bet"</h3>
-            <label>"Filter predictions"
-                <input type="search" placeholder="Name or ID" autofocus on:input=move |e| {set_search.set(event_target_value(&e))}/>
-            </label>
-            <label>"Prediction "{move || prediction.get()}
-                <select on:input=move |e| {set_prediction.set(event_target_value(&e))}>
-                    <option value="" selected disabled >"Select prediction"</option>
-                    <For each=move || {
-                        match predictions.get() {
-                            Some(Ok(mut predictions)) => {
-                                predictions.retain(|prediction| {
-                                    if prediction.state != MarketState::Trading {return false}
-                                    if let Ok(id) = search.get().parse::<i64>() {
-                                        prediction.id == id
-                                    } else {
-                                        prediction.name.contains(search.get().as_str())
-                                    }
-                                });
-                                predictions.sort_by(|a,b| a.name.cmp(&b.name));
-                                predictions
-                            },
-                            None | Some(Err(_))=> vec![],
-                        }
+            <Box style="width: 50%"><UnwrapResource resource=predictions view=move |mut predictions|
+            {
+                predictions.retain(|prediction| {
+                    if prediction.state != MarketState::Trading {return false}
+                    if let Ok(id) = search.get().parse::<i64>() {
+                        prediction.id == id
+                    } else {
+                        prediction.name.contains(search.get().as_str())
                     }
-                    key=move |prediction| prediction.id
-                    children=move |prediction| {
-                        view! {
-                            <option value={prediction.id}>{prediction.name}" ("{prediction.id}")"</option>
-                        }
-                    }
+                });
+                predictions.sort_by(|a,b| a.name.cmp(&b.name));
+                view!{
+                    <OptionalSelect options=predictions
+                        selected=prediction
+                        set_selected=move |v| set_prediction.set(v)
+                        search_text_provider=move |o: PredictionOverviewResponse| format!("{} ({})", o.name, o.id)
+                        render_option=move |o: PredictionOverviewResponse| format!("{} ({})", o.name, o.id)
+                        allow_deselect=false
                     />
+                }
 
-                </select>
-            </label>
-            <div class="grid">
-                <fieldset>
-                    <legend>"Bet"</legend>
-                    <label>
-                    <input type="radio" value="true" name="bet" on:input=move |e| {set_bet.set(event_target_value(&e))} />
-                    "True"
-                    </label>
-                    <label>
-                    <input type="radio" value="false" name="bet" on:input=move |e| {set_bet.set(event_target_value(&e))} />
-                    "False"
-                    </label>
-                </fieldset>
-                <label>
-                "Amount"
-                <input type="number" value=amount on:input=move |e| {set_amount.set(event_target_value(&e))} />
-                </label>
+            } /></Box>
+            // <fieldset>
+            //     <legend>"Bet"</legend>
+            //     <label>
+            //     <input type="radio" value="true" name="bet" on:input=move |e| {set_bet.set(event_target_value(&e))} />
+            //     " True "
+            //     </label>
+            //     <label>
+            //     <input type="radio" value="false" name="bet" on:input=move |e| {set_bet.set(event_target_value(&e))} />
+            //     " False "
+            //     </label>
+            // </fieldset>
+            <div>
+                <Toggle state=bet set_state=set_bet icons=ToggleIcons {
+                    on: leptos_icons::BsIcon::BsCheck.into(),
+                    off: leptos_icons::BsIcon::BsX.into(),
+                } style="--toggle-slider-on-background-color: green; --toggle-slider-off-background-color: red;"/>
+                <p>{move || format!("Bet: {}", bet.get())}</p>
+            </div>
+            <div>
+                <NumberInput get=amount set=set_amount step=100.0 />
+                <label>"Amount (sats)"</label>
             </div>
             <label><small>
             {
@@ -897,13 +897,13 @@ pub fn AddBet(state: ReadSignal<MercadoState>) -> impl IntoView {
                     }
                 }
             }</small>
-            <button on:click=move |_| {
+            <Button on_click=move |_| {
                 match add_bet() {
                     Ok(action) => message.set(None),
                     Err(e) => message.set(Some(e.to_string().into_view())),
                 }
-            } >"Add"</button></label>
-        </div>
+            } >"Add"</Button></label>
+        </Stack>
     }
 }
 #[component]
@@ -948,45 +948,45 @@ pub fn Wallet(state: ReadSignal<MercadoState>) -> impl IntoView {
     );
 
     view! {
-        <div>
-            <h3>"Bitcoin Wallet"</h3>
+        <Stack spacing=Size::Em(1.0)>
+            <H3>"Bitcoin Wallet"</H3>
             <UnwrapResourceFor state=state resource=balances view=move |balances| view!{
                 <p>
                     "Available Balance: "{balances.0}" sats"<br/>
                     "Total Balance: "{balances.1}" sats"<br/>
                 </p>
             } />
-            <div class="grid">
+            <Stack orientation=StackOrientation::Horizontal spacing=Size::Em(2.0)>
                 <div>
-                    <a role="button" href="/make_deposit">"Make Deposit"</a>
+                    <LinkButton href="/make_deposit">"Make Deposit"</LinkButton>
                     <UnwrapResourceForUser user=user state=state resource=deposits view=move |deposits| view!{
-                        <table>
-                            <tr>
+                        <TableContainer><Table bordered=true hoverable=true>
+                            <Thead><tr>
                                 <th>"Invoice"</th>
                                 <th>"State"</th>
-                            </tr>
-                            <For each=move || deposits.clone() key=|id| id.clone() children=move |id: RowId| view!{
+                            </tr></Thead>
+                            <Tbody><For each=move || deposits.clone() key=|id| id.clone() children=move |id: RowId| view!{
                                 <DepositListItem state=state id=id />
-                            } />
-                        </table>
+                            } /></Tbody>
+                        </Table></TableContainer>
                     } />
                 </div>
                 <div>
-                    <a role="button" href="/make_withdrawal">"Make Withdrawal"</a>
+                    <LinkButton href="/make_withdrawal">"Make Withdrawal"</LinkButton>
                     <UnwrapResourceForUser user=user state=state resource=withdrawals view=move |withdrawals| view!{
-                        <table>
-                            <tr>
+                        <TableContainer><Table bordered=true hoverable=true>
+                            <Thead><tr>
                                 <th>"Payment hash"</th>
                                 <th>"State"</th>
-                            </tr>
-                                <For each=move || withdrawals.clone() key=|id| id.clone() children=move |id: RowId| view!{
-                                    <WithdrawListItem state=state id=id />
-                                } />
-                        </table>
+                            </tr></Thead>
+                            <Tbody><For each=move || withdrawals.clone() key=|id| id.clone() children=move |id: RowId| view!{
+                                <WithdrawListItem state=state id=id />
+                            } /></Tbody>
+                        </Table></TableContainer>
                     } />
                 </div>
-            </div>
-        </div>
+            </Stack>
+        </Stack>
     }
     .into_view()
 }

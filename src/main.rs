@@ -1,5 +1,6 @@
 #![allow(unused)]
 use crate::components::*;
+use leptonic::prelude::*;
 use leptos::*;
 use leptos_router::*;
 use mercado::api::{AccessRequest, UserResponse};
@@ -47,37 +48,35 @@ fn main() {
         });
 
         view! {
-            <div id="root">
+            <Root default_theme=LeptonicTheme::Dark>
                 <Router>
                     <Navi state=state set_state=set_state />
-                    <main class="container">
-                        <Routes>
+                    <Box style="padding-left: 20px; padding-right: 20px;"><Routes>
+                        <Route path="" view=App/>
+                        <Route path="prediction" view=move || view! {<Outlet/>}>
+                            <Route path=":id" view=move || view! {<PredictionOverview state=state />}/>
                             <Route path="" view=App/>
-                            <Route path="prediction" view=move || view! {<Outlet/>}>
-                                <Route path=":id" view=move || view! {<PredictionOverview state=state />}/>
-                                <Route path="" view=App/>
-                            </Route>
-                            <Route path="login" view=move || view! {<Login set_state=set_state />} />
-                            <Route path="my_bets" view=move || view!{<MyBets state=state />} />
-                            <Route path="my_judges" view=move || view!{<MyJudges state=state />} />
-                            <Route path="new_prediction" view=move || view!{<NewPrediction state=state />} />
-                            <Route path="add_bet" view=move || view!{<AddBet state=state />} />
-                            <Route path="wallet" view=move || view! {<Outlet/>}>
-                                <Route path=":id" view=move || view! {<Wallet state=state />}/>
-                                <Route path="" view=move || view!{<Wallet state=state/>}/>
-                            </Route>
-                            <Route path="make_deposit" view=move || view! {<Outlet/>}>
-                                <Route path=":id" view=move || view! {<MakeDeposit state=state />}/>
-                                <Route path="" view=move || view!{<MakeDeposit state=state/>}/>
-                            </Route>
-                            <Route path="make_withdrawal" view=move || view! {<Outlet/>}>
-                                <Route path=":id" view=move || view! {<MakeWithdrawal state=state />}/>
-                                <Route path="" view=move || view!{<MakeWithdrawal state=state/>}/>
-                            </Route>
-                        </Routes>
-                    </main>
+                        </Route>
+                        <Route path="login" view=move || view! {<Login set_state=set_state />} />
+                        <Route path="my_bets" view=move || view!{<MyBets state=state />} />
+                        <Route path="my_judges" view=move || view!{<MyJudges state=state />} />
+                        <Route path="new_prediction" view=move || view!{<NewPrediction state=state />} />
+                        <Route path="add_bet" view=move || view!{<AddBet state=state />} />
+                        <Route path="wallet" view=move || view! {<Outlet/>}>
+                            <Route path=":id" view=move || view! {<Wallet state=state />}/>
+                            <Route path="" view=move || view!{<Wallet state=state/>}/>
+                        </Route>
+                        <Route path="make_deposit" view=move || view! {<Outlet/>}>
+                            <Route path=":id" view=move || view! {<MakeDeposit state=state />}/>
+                            <Route path="" view=move || view!{<MakeDeposit state=state/>}/>
+                        </Route>
+                        <Route path="make_withdrawal" view=move || view! {<Outlet/>}>
+                            <Route path=":id" view=move || view! {<MakeWithdrawal state=state />}/>
+                            <Route path="" view=move || view!{<MakeWithdrawal state=state/>}/>
+                        </Route>
+                    </Routes></Box>
                 </Router>
-            </div>
+            </Root>
         }
     })
 }
