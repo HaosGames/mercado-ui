@@ -349,7 +349,10 @@ pub fn PredictionOverview(state: ReadSignal<MercadoState>) -> impl IntoView {
                 <Button on_click=move |_| {
                     refresh.set(!refresh.get());
                 }>"Refresh"</Button>
-                <LinkButton href={move || format!("/add_bet?prediction={}", prediction.id)} >"Add bet"</LinkButton>
+                <Cond cond={prediction.state == MarketState::Trading} view=view!{
+                    <LinkButton href={move || format!("/add_bet?prediction={}", prediction.id)} >
+                        "Add bet"</LinkButton>
+                } />
             </p>
             <JudgeList prediction=Some(prediction.id) user=user state=state refresh=refresh collapsable=true/>
             <BetList prediction=Some(prediction.id) state=state collapsable=true
@@ -707,20 +710,20 @@ pub fn NewPrediction(state: ReadSignal<MercadoState>) -> impl IntoView {
                 <div>
                     <DateSelector value=time::OffsetDateTime::now_utc() on_change=move |date: time::OffsetDateTime| {
                         set_end.set(date)
-                    } />
+                    }/>
                     <label>"Ends at "{move || format!("{}", end.get())}</label>
                 </div>
                 <div>
                     <div>
-                        <NumberInput get=decision set=set_decision step=1.0 />
+                        <NumberInput get=decision set=set_decision step=1.0 min=1.0 />
                         <label>"Decision duration"</label>
                     </div>
                     <div>
-                        <NumberInput get=judge_share set=set_judge_share step=1000.0 />
+                        <NumberInput get=judge_share set=set_judge_share step=1000.0 min=0.0 />
                         <label>"Portion for Judges (ppm)"</label>
                     </div>
                     <div>
-                        <NumberInput get=judge_count set=set_judge_count step=1.0 />
+                        <NumberInput get=judge_count set=set_judge_count step=1.0 min=1.0 />
                         <label>"How many judges need to participate?"</label>
                     </div>
                 </div>
@@ -878,7 +881,7 @@ pub fn AddBet(state: ReadSignal<MercadoState>) -> impl IntoView {
                 <p>{move || format!("Bet: {}", bet.get())}</p>
             </div>
             <div>
-                <NumberInput get=amount set=set_amount step=100.0 />
+                <NumberInput get=amount set=set_amount step=100.0 min=1.0 />
                 <label>"Amount (sats)"</label>
             </div>
             <label><small>
@@ -1087,7 +1090,7 @@ pub fn MakeDeposit(state: ReadSignal<MercadoState>) -> impl IntoView {
         <Stack spacing=Size::Em(1.0)>
             <h3>"Make Deposit"</h3>
             <div>
-                <NumberInput get=amount set=amount.write_only() step=1000.0 />
+                <NumberInput get=amount set=amount.write_only() step=1000.0 min=1.0 />
                 <label>"Amount"</label>
             </div>
             <p>{
@@ -1165,7 +1168,7 @@ pub fn MakeWithdrawal(state: ReadSignal<MercadoState>) -> impl IntoView {
         <Stack spacing=Size::Em(1.0)>
             <h3>"Make Withdrawal"</h3>
             <div>
-                <NumberInput get=amount set=amount.write_only() step=1000.0 />
+                <NumberInput get=amount set=amount.write_only() step=1000.0 min=1.0 />
                 <label>"Amount (sats)"</label>
             </div>
             <TextInput get=invoice set=invoice.write_only() placeholder="Invoice" />
