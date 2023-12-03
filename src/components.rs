@@ -128,27 +128,17 @@ pub fn PredictionListItem(
     prediction: PredictionOverviewResponse,
     refresh: RwSignal<bool>,
 ) -> impl IntoView {
-    let prediction = create_rw_signal(prediction);
-    let ratio = create_local_resource(
-        move || refresh.get(),
-        move |_| {
-            get_prediction_ratio(PredictionRequest {
-                prediction: prediction.get().id,
-                user: None,
-            })
-        },
-    );
+    let ratio = prediction.ratio;
     view! {
-        <UnwrapResource resource=ratio view=move |ratio| view! {
         <Box style="width: 100%"><Separator /></Box>
         <Stack orientation=StackOrientation::Horizontal spacing=Size::Zero style="width:100%">
-            <Box style="width:55%"><Link href={move || format!("/prediction/{}", prediction.get().id)}>{move || prediction.get().name}</Link></Box>
+            <Box style="width:55%"><Link href={format!("/prediction/{}", prediction.id)}>{prediction.name}</Link></Box>
             <Box style="width:45%"><ProgressBar progress=Some(ratio.0 as f64) max={(ratio.0+ratio.1) as f64} /></Box>
         </Stack>
         <Stack orientation=StackOrientation::Horizontal spacing=Size::Zero style="width:100%">
-            <Box style="width:20%">{move || prediction.get().trading_end.to_string()}</Box>
-            <Box style="width:15%">{move || prediction.get().judge_share_ppm / 10000}"%"</Box>
-            <Box style="width:20%">{move || prediction.get().state.to_string()}</Box>
+            <Box style="width:20%">{prediction.trading_end.to_string()}</Box>
+            <Box style="width:15%">{prediction.judge_share_ppm / 10000}"%"</Box>
+            <Box style="width:20%">{prediction.state.to_string()}</Box>
             <Box style="width:20%">
                 <span>{format!("True: {}% ({} sats)",
                      ratio.0 as f32/(ratio.0+ratio.1)as f32*100.0,
@@ -167,7 +157,6 @@ pub fn PredictionListItem(
                 )}</span>
             </Box>
         </Stack>
-        } />
     }
 }
 #[component]
@@ -190,7 +179,8 @@ pub fn PredictionList() -> impl IntoView {
                     <Box style="width:45%"><H3>"Capital"</H3></Box>
                 </Stack>
                 {
-                    predictions.sort_by(|a, b| a.id.cmp(&b.id));
+                    predictions.sort_by(|a, b| (a.ratio.0+a.ratio.1).cmp(&(b.ratio.0+b.ratio.1)));
+                    predictions.reverse();
                     predictions.into_iter()
                     .map(|prediction| view! {<PredictionListItem prediction=prediction refresh=refresh/>})
                     .collect::<Vec<_>>()
@@ -824,6 +814,7 @@ pub fn AddBet(state: ReadSignal<MercadoState>) -> impl IntoView {
             judge_count: 3,
             trading_end: Utc::now(),
             decision_period_sec: 86400,
+            ratio: (0, 0),
         }))
     } else {
         create_signal::<Option<PredictionOverviewResponse>>(None)
