@@ -9,7 +9,7 @@ edition = "2021"
 leptos = { version = "0.5.4", features = ["csr"] }
 leptos_router = { version = "0.5.4", features = ["csr"]}
 leptos_meta = {version = "0.5.4", features = ["csr"]}
-mercado = { path = "../mercado", features = ["client"], default-features = false }
+mercado = { git = "https://github.com/HaosGames/mercado", features = ["client"], default-features = false }
 anyhow = "1.0"
 chrono = { version = "0.4", features = ["serde"]}
 serde = { version = "1.0", features = ["derive"]}
